@@ -1,0 +1,3 @@
+[ ] Maybe create a subdirectory for systray plugins and move the Tk stuff there.
+[ ] Make a directory for Ion-specific configuration files and import those.
+
