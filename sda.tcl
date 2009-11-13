@@ -39,9 +39,15 @@ proc io_gauge_update {value} {
 	# Green|Red?  Green|Orange|Red?  Green|Yellow|Orange|Red?
 	# Note: yellow is no terribly visible against the default pale grey background.
 	# Perhaps a fixed black background would be appropriate.
+	# For % util.:
 	if     {$value >= 0.90} then {set gauge_colour red} \
 	elseif {$value >= 0.75} then {set gauge_colour orange} \
 	elseif {$value >= 0.50} then {set gauge_colour yellow} \
+	else                         {set gauge_colour green}
+
+	# For queue length: < 1 is OK, more than 2 is def bad.  Give a bit of leeway (1.01 is close enough to 1 to be left green).
+	if     {$value >= 0.5} then {set gauge_colour red} \
+	elseif {$value >= 0.35} then {set gauge_colour orange} \
 	else                         {set gauge_colour green}
 
 	.io_gauge.meter configure -height [expr {$value * ($indicator_height-2)}] -background $gauge_colour
@@ -57,9 +63,15 @@ while true {
 		# 0 -> whole match, 1 -> "sda", ...
 		set sda_utilisation [expr {$expect_out(12,string) / 100.0}]
 		set sda_queue_length [expr {$expect_out(9,string)}]
-		puts "queue length = $sda_queue_length"	;# Not actually queue length: scaled.
+		set sda_queue_length_meter [expr {1 - pow(1/sqrt(2.0), $sda_queue_length)}]
+		puts "queue length = $sda_queue_length; meter = $sda_queue_length_meter"
+
 	#	io_gauge_update $sda_utilisation
-		io_gauge_update [expr {$sda_queue_length / 150}]	;# Arbitrary scaling; I've seen the queue length exceed 400(!) on sbis4079.
+		# A queue length of 1 is fine for a single drive; 2 or higher may be a problem.  I've seen the queue length exceed 400(!) on sbis4079's single drive.
+		# What sort of scaling to use?  Maybe logarithmic?  meter = 1 - (constant ^ queue_length) looks suitable.
+		io_gauge_update $sda_queue_length_meter
+	#	io_gauge_update [expr {1 - 0.70710 ** $sda_queue_length}]	;# Doesn't work - maybe due to no ** in older Tcl usend in the expectk I have?  Seems OK in Tcl 8.5.
+	#	io_gauge_update [expr {$sda_queue_length / 150}]	;# Old arbitrary scaling
 	}
 }
 
