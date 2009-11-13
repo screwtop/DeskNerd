@@ -13,7 +13,7 @@ source {Preferences.tcl}
 . configure -background $statusbar_background_colour
 
 #pack [ttk::menubutton .launch -text "Launch" -menu .launch.menu]	;# tile
-pack [menubutton .launch      -text "Launch" -menu .launch.menu -relief groove]
+pack [menubutton .launch      -text "Launch" -menu .launch.menu -relief groove -borderwidth 2]
 #pack [menubutton .files      -text "Files" -menu .launch.menu -relief groove -background $statusbar_background_colour -foreground $statusbar_foreground_colour]
 
 

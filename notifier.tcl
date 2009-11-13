@@ -1,6 +1,6 @@
 #!/usr/local/bin/wish
 
-# A notification component for DeskNerd
+# A notification component for DeskNerd (just rough prototyping of ideas at present)
 # CME 2009-05-21
 
 # Used for reporting important events from system log, arrival of e-mail, new items from RSS, Twitter, etc., and so on.
@@ -18,7 +18,8 @@ option add *TearOff 0
 #. configure -background $statusbar_background_colour	;# Set in Preferences.tcl
 
 # Button for dismiss/acknowledge/delete/OK/whatever to call it.
-pack [ttk::menubutton .notifier      -text "Notifier (3 unread)" -menu .notifier.menu -relief groove] -side left
+pack [menubutton .notifier      -text "Notifier (3 unread)" -menu .notifier.menu -relief groove] -side left
+#pack [ttk::menubutton .notifier      -text "Notifier (3 unread)" -menu .notifier.menu -relief groove] -side left	;# Doesn't work: no -relief in ttk?
 #pack [button .unread_button      -text "Unread" -relief groove] -side left
 #pack [menubutton .files      -text "Files" -menu .files.menu -relief groove]
 
@@ -33,7 +34,7 @@ menu .notifier.menu
 
 
 
-# Hard-coded list for testing:
+# Hard-coded list for testing (the real system should employ a database for collecting and managing all logging information):
 set notification_list [list {Mail: Nigel Stanger} {Hotblack: PostgreSQL} {Twitter: Andrew}]
 
 # Spinbox to display the message summary.  Click or double-click to show detail.
@@ -42,8 +43,9 @@ set notification_list [list {Mail: Nigel Stanger} {Hotblack: PostgreSQL} {Twitte
 #pack [tk::spinbox .s -from 1.0 -to 100.0 -textvariable spinval] -side left
 # spinbox doesn't seem to have -listvariable after all; try -value
 pack [tk::spinbox .summary -values $notification_list] -side left
+# Would be good to colour items according to whether they've been viewed.  Can you make items in a spinbox clickable, to see the full detail (or switch to another application, or launch an application?)?
 
-# Alternatively, a pop-up menu with recent notifications might be better - less fiddly to navigate.  It could have further sub-menus for read/seen items, yesterday's items, etc.  The button itself should have some way of showing that there are new notifications.  Maybe colour, bold, a glyph of dingbat disposition, flashing (horror! - maybe only briefly).
+# Alternatively, a pop-up menu with recent notifications might be better - less fiddly to navigate.  It could have further sub-menus for read/seen items, yesterday's items, categories/systems/subsystems/services, etc.  The button itself should have some way of showing that there are new notifications.  Maybe colour, bold, a glyph of dingbat disposition, flashing (horror! - maybe only briefly).
 
 
 

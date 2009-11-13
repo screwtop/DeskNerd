@@ -1,5 +1,6 @@
 # Some kind of centralised preferences script fragment for DeskNerd.
 # Obviously, this should all propery be stored in a database somewhere, eventually!
+# NOTE: see also ~/.Xdefaults (Tk honours this file).  
 
 # What sort of font settings?  Mono/Sans/Serif?  Or maybe more specific function-based ones, depending on where it'll appear?  Bold in places?
 
