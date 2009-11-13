@@ -1,0 +1,12 @@
+# # Add this to ~/.xsession or equivalent to run when X starts.
+# My DeskNerd commands for the Ion3 systray:
+#alias wish wish8.5
+# Does ~ not get expanded in here?
+cd /home/cedwards/Documents/Projects/DeskNerd
+wish8.5 ./files.tcl  2>&1  &
+wish8.5 ./launcher.tcl  2>&1  &
+wish8.5 ./time.tcl  2>&1  &
+wish8.5 ./cpu.tcl  2>&1  &
+./sda.tcl  2>&1  &
+./memory.tcl  2>&1  &
+
