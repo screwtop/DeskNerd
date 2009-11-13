@@ -19,7 +19,7 @@ source {every.tcl}
 # TODO: what about hyperthreading/logical CPUs?
 set cpu_count 4
 #set cpu_count [lindex $argv 0]
-set refresh_interval_ms 50	;# On a system with 1000 Hz timer, this should be good down to 1 ms.
+set refresh_interval_ms [expr {round(4 / 60.0 * 1000)}]	;# On a system with 1000 Hz timer, this should be good down to 1 ms.  50 is probably a reasonable tradeoff.  Or a multiple of the likely display hardware refresh period.
 
 set ::env(TERM) dumb	;# to avoid ANSI codes from dstat
 
