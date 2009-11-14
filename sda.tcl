@@ -15,10 +15,30 @@ source {Preferences.tcl}
 set indicator_width 8
 set indicator_height 20
 
+
 # Pop-up menu for convenient exiting:
+# TODO: add switching between performance metrics (%util, queue length, I/Os per second, etc.), and perhaps also devices.
 menu .popup_menu
 	.popup_menu add command -label {Close} -background orange -command {exit}
 bind . <3> "tk_popup .popup_menu %X %Y"
+
+
+# A sort of interactive tool-tip, implemented as a menu.
+menu .info_menu
+	# TODO: include device name and perhaps other info (make, model, capacity, ...) as well.
+	.info_menu add command -label {DeskNerd Disk I/O Meter} -command {}
+	.info_menu add separator
+	.info_menu add command -label "% Util.: ??" -command {}
+	.info_menu add command -label "Queue Length: ??" -command {}
+# Could be invoked by mouse-over or left click perhaps.
+bind . <1> "tk_popup .info_menu %X %Y"
+
+# Procedure to update the information in the "tooltip" menu.  Ideally this would only be run when necessary, e.g. when actually invoking the menu, but I'm not sure if that's possible.  Actually, having it called from the main expect loop is good in that you can watch the numbers in realtime changing within the menu.  I like.
+proc update_tooltip_menu {util depth} {
+	.info_menu entryconfigure 2 -label "Util.: [expr {round($util * 100)}] %"
+	.info_menu entryconfigure 3 -label "Queue: $depth"
+}
+
 
 
 # Container frame
@@ -64,14 +84,16 @@ while true {
 		set sda_utilisation [expr {$expect_out(12,string) / 100.0}]
 		set sda_queue_length [expr {$expect_out(9,string)}]
 		set sda_queue_length_meter [expr {1 - pow(1/sqrt(2.0), $sda_queue_length)}]
-		puts "queue length = $sda_queue_length; meter = $sda_queue_length_meter"
+	#	puts "queue length = $sda_queue_length; meter = $sda_queue_length_meter"
 
-	#	io_gauge_update $sda_utilisation
+		io_gauge_update $sda_utilisation
 		# A queue length of 1 is fine for a single drive; 2 or higher may be a problem.  I've seen the queue length exceed 400(!) on sbis4079's single drive.
 		# What sort of scaling to use?  Maybe logarithmic?  meter = 1 - (constant ^ queue_length) looks suitable.
-		io_gauge_update $sda_queue_length_meter
+	#	io_gauge_update $sda_queue_length_meter
 	#	io_gauge_update [expr {1 - 0.70710 ** $sda_queue_length}]	;# Doesn't work - maybe due to no ** in older Tcl usend in the expectk I have?  Seems OK in Tcl 8.5.
 	#	io_gauge_update [expr {$sda_queue_length / 150}]	;# Old arbitrary scaling
+
+		update_tooltip_menu $sda_utilisation $sda_queue_length
 	}
 }
 
