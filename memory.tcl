@@ -34,9 +34,13 @@ bind . <3> "tk_popup .popup_menu %X %Y"
 menu .info_menu
 	.info_menu add command -label $application_name -command {}
 	.info_menu add separator
-	.info_menu add command -label "Physical RAM Used: ??" -command {}
+	.info_menu add command -label "Total Physical RAM: ??" -command {}
+	.info_menu add command -label "Total Swap: ??" -command {}
+	.info_menu add separator
+#	.info_menu add command -label "Physical RAM Used: ??" -command {}
 	.info_menu add command -label "Effective Physical RAM Used: ??" -command {}
-	.info_menu add command -label "Physical RAM Free: ??" -command {}
+#	.info_menu add command -label "Physical RAM Free: ??" -command {}
+	.info_menu add command -label "Effective Physical RAM Free: ??" -command {}
 	.info_menu add separator
 	.info_menu add command -label "Shared Mem: ??" -command {}
 	.info_menu add command -label "Buffer Mem: ??" -command {}
@@ -47,14 +51,20 @@ menu .info_menu
 # Could be invoked by mouse-over or left click perhaps.
 bind . <1> "tk_popup .info_menu %X %Y"
 
-proc update_tooltip_menu {ram_used effective_ram_used ram_free shared buffer cache swap_used swap_free} {
-	set i 1	;# 1 if not using tear-off menus, 2 with.
-	.info_menu entryconfigure [incr i] -label "Physical RAM Used: [expr {round($ram_used / 1024.0)}] MiB"
-	.info_menu entryconfigure [incr i] -label "Effective Physical RAM Used: [expr {round($effective_ram_used / 1024.0)}] MiB"
-	.info_menu entryconfigure [incr i] -label "Physical RAM Free: [expr {round($ram_free / 1024.0)}] MiB"
+proc update_tooltip_menu {ram_total ram_used effective_ram_used ram_free shared buffer cache swap_total swap_used swap_free} {
+	set i 0	;# Counter for keeping track of menu item indexes.
+	incr i	;# Increment to skip over separator items in the menu.
+	# Seems a bit ridiculous updating the physical RAM every time, but swap could conceivably vary.
+	.info_menu entryconfigure [incr i] -label "Total Physical RAM: [expr {round($ram_total / 1024.0)}] MiB"
+	.info_menu entryconfigure [incr i] -label "Total Swap: [expr {round($swap_total / 1024.0)}] MiB"
 	incr i
-	.info_menu entryconfigure [incr i] -label "Shared Mem: [expr {round($shared / 1024.0)}] MiB"
-	.info_menu entryconfigure [incr i] -label "Buffer Mem: [expr {round($buffer / 1024.0)}] MiB"
+	#	.info_menu entryconfigure [incr i] -label "Physical RAM Used: [expr {round($ram_used / 1024.0)}] MiB"
+	.info_menu entryconfigure [incr i] -label "Effective Physical RAM Used: [expr {round($effective_ram_used / 1024.0)}] MiB"
+#	.info_menu entryconfigure [incr i] -label "Physical RAM Free: [expr {round($ram_free / 1024.0)}] MiB"
+	.info_menu entryconfigure [incr i] -label "Effective Physical RAM Free: [expr {round(($ram_total - $effective_ram_used) / 1024.0)}] MiB"	
+	incr i
+	.info_menu entryconfigure [incr i] -label "Shared: [expr {round($shared / 1024.0)}] MiB"
+	.info_menu entryconfigure [incr i] -label "Buffers: [expr {round($buffer / 1024.0)}] MiB"
 	.info_menu entryconfigure [incr i] -label "System Cache: [expr {round($cache / 1024.0)}] MiB"
 	incr i
 	.info_menu entryconfigure [incr i] -label "Swap Used: [expr {round($swap_used / 1024.0)}] MiB"
@@ -103,7 +113,10 @@ while true {
 		set mem_cached $expect_out(7,string)
 	}
 
-	set effective_ram_used [expr $ram_used - $mem_shared - $mem_buffer - $mem_cached]
+	# Since the system will use spare physical memory for filesystem cache, the fs cache doesn't really count towards memory used.
+	set effective_ram_used [expr $ram_used - $mem_cached]
+	# Shared and buffer memory are genuine RAM consumers, though, so don't do this (though it won't normally make a huge difference):
+#	set effective_ram_used [expr $ram_used - $mem_shared - $mem_buffer - $mem_cached]
 
 	expect -re {(Swap:) +([0-9]+) +([0-9]+) +([0-9]+)} {
 		set swap_total $expect_out(2,string)
@@ -112,7 +125,7 @@ while true {
 	}
 
 	# Update info menu-panel:
-	update_tooltip_menu $ram_used $effective_ram_used $ram_free $mem_shared $mem_buffer $mem_cached $swap_used $swap_free
+	update_tooltip_menu $ram_total $ram_used $effective_ram_used $ram_free $mem_shared $mem_buffer $mem_cached $swap_total $swap_used $swap_free
 
 	# For display, the effective physical RAM utilisation is the important thing (filesystem cache will make room for processes if necessary).
 	memory_gauge_update [expr {double($effective_ram_used) / double($ram_total)}]
