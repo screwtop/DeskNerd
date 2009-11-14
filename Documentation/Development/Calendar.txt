@@ -1,9 +1,9 @@
 Just thinking idly about how to do calendar stuff for DeskNerd, 2009-11-15.
 
 
-We have a date-time display in the systray already, and I had in mind to add a calendar pop-up object to that.  Some way of conveniently including appointments and deadlines in that would be useful.
+We have a date-time display in the systray already, and I had in mind to add a calendar pop-up object to that.  Some way of conveniently including appointments and deadlines in that would be useful.  This would be a client application connected to a database back-end.  Using HTTP for disseminating data could be useful for remote access where Internet access is restricted.
 
-What sorts of time-based things might need to be recorded?  Almost everything could conceivably have a timestamp, but not everything is necessarily something you'd need to see in a calendar.  Then again, think of R. Buckminster Fuller's "Chronofile"...
+What sorts of time-based things might need to be recorded?  Almost everything could conceivably have a timestamp, but not everything is necessarily something you'd need to see in a calendar.  Then again, think of R. Buckminster Fuller's "Chronofile"...  Indeed, to be able to browse from the calendar to other items could be useful: I'm thinking not just traditional calendar items like appointments, but any e-mail sent or received, documents that have been created or edited recently, system log events, etc.  I guess each user would have their own stuff, but some things would need to be shareable and this would require some kind merge capability and distribution (maybe look at iCalendar).
 
 
 One fundamental distinction could be between "instantaneous" events (points in time) vs. things that have a duration.
