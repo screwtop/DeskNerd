@@ -3,12 +3,17 @@
 # Basic memory usage indicator for DeskNerd.  We could show cache, swap, wired, etc. but what we really care about is how much physical RAM is used out of the available physical RAM.
 # Works by spawning Linux's "free" command in repeat-report mode (-s <nsecs>) and parsing its output.
 
+# TODO: add a (separate, shareable) proc for converting bytes to MiB, GiB, etc., perhaps automatically according to the magnitude.
+
+
 wm title . {DeskNerd_MemoryMeter}
+set application_name {DeskNerd Memory Meter}
 
 source {Preferences.tcl}
+# TODO: fixed-width font for menu display
 source {every.tcl}
 
-set refresh_interval_s 5	;# Memory utilisation doesn't normally change very rapidly; 1..10 s may be quite OK.
+set refresh_interval_s 1	;# Memory utilisation doesn't normally change very rapidly; 1..10 s may be quite OK.
 
 #set ::env(TERM) dumb	;# to avoid ANSI codes from dstat
 
@@ -18,30 +23,61 @@ set indicator_height 20
 
 # Pop-up menu for convenient exiting:
 menu .popup_menu
-	.popup_menu add command -label "RAM Usage Meter" -command {}
+	.popup_menu add command -label $application_name -command {}	;# TODO: add about dialog for this?
+	.popup_menu add separator
 	.popup_menu add command -label {Close} -background orange -command {exit}
 bind . <3> "tk_popup .popup_menu %X %Y"
 
+# Extra info menu, tooltip styles.
+# TODO: maybe add total amount of physical RAM and swap.
+# TODO: maybe add % reporting for physical RAM (effective) and swap.
+menu .info_menu
+	.info_menu add command -label $application_name -command {}
+	.info_menu add separator
+	.info_menu add command -label "Physical RAM Used: ??" -command {}
+	.info_menu add command -label "Effective Physical RAM Used: ??" -command {}
+	.info_menu add command -label "Physical RAM Free: ??" -command {}
+	.info_menu add separator
+	.info_menu add command -label "Shared Mem: ??" -command {}
+	.info_menu add command -label "Buffer Mem: ??" -command {}
+	.info_menu add command -label "System Cache: ??" -command {}
+	.info_menu add separator
+	.info_menu add command -label "Swap Used: ??" -command {}
+	.info_menu add command -label "Swap Free: ??" -command {}
+# Could be invoked by mouse-over or left click perhaps.
+bind . <1> "tk_popup .info_menu %X %Y"
 
-# Container frame
+proc update_tooltip_menu {ram_used effective_ram_used ram_free shared buffer cache swap_used swap_free} {
+	set i 1	;# 1 if not using tear-off menus, 2 with.
+	.info_menu entryconfigure [incr i] -label "Physical RAM Used: [expr {round($ram_used / 1024.0)}] MiB"
+	.info_menu entryconfigure [incr i] -label "Effective Physical RAM Used: [expr {round($effective_ram_used / 1024.0)}] MiB"
+	.info_menu entryconfigure [incr i] -label "Physical RAM Free: [expr {round($ram_free / 1024.0)}] MiB"
+	incr i
+	.info_menu entryconfigure [incr i] -label "Shared Mem: [expr {round($shared / 1024.0)}] MiB"
+	.info_menu entryconfigure [incr i] -label "Buffer Mem: [expr {round($buffer / 1024.0)}] MiB"
+	.info_menu entryconfigure [incr i] -label "System Cache: [expr {round($cache / 1024.0)}] MiB"
+	incr i
+	.info_menu entryconfigure [incr i] -label "Swap Used: [expr {round($swap_used / 1024.0)}] MiB"
+	.info_menu entryconfigure [incr i] -label "Swap Free: [expr {round($swap_free / 1024.0)}] MiB"
+}
+
+
+# Set up the gauge:
+
+# Container frame:
 pack [frame .memory_gauge  -width $indicator_width  -height $indicator_height  -relief sunken  -borderwidth 1 -background black] -side left
 	
-# Meter gauge is also done as a frame
+# Meter gauge is also simply done as a frame:
 place [frame .memory_gauge.meter     -width [expr {$indicator_width-2}] -height 0  -relief flat -borderwidth 0 -background green] -anchor sw -x 0 -y [expr {$indicator_height-2}]
 
 
-
-# Then again, by duplicating this, we can customise the colouring function...
+# Update the gauge:
 proc memory_gauge_update {value} {
 	global indicator_height .memory_gauge.meter
-	# We're assuming value is a 0..1 factor.
-	# Colour thresholds?  Overkill to store these in a data structure somewhere?
-	# Green|Red?  Green|Orange|Red?  Green|Yellow|Orange|Red?
-	# Note: yellow is no terribly visible against the default pale grey background.
-	# Perhaps a fixed black background would be appropriate.
+
 	if     {$value >= 0.90} then {set gauge_colour red} \
-	elseif {$value >= 0.75} then {set gauge_colour orange} \
-	elseif {$value >= 0.50} then {set gauge_colour yellow} \
+	elseif {$value >= 0.80} then {set gauge_colour orange} \
+	elseif {$value >= 0.60} then {set gauge_colour yellow} \
 	else                         {set gauge_colour green}
 
 	.memory_gauge.meter configure -height [expr {$value * ($indicator_height-2)}] -background $gauge_colour
@@ -59,20 +95,27 @@ spawn free -s $refresh_interval_s
 while true {
 	expect -re {(Mem:) +([0-9]+) +([0-9]+) +([0-9]+) +([0-9]+) +([0-9]+) +([0-9]+)} {
 		# 0 -> whole match, 1 -> "Mem:", ...
-	#	puts $expect_out(0,string)
-		set ram_available $expect_out(2,string)
-	#	puts $ram_available
-	
-	}
-	expect -re {(.*buffers/cache:) +([0-9]+) +([0-9]+)} {
-	#	puts $expect_out(0,string)
-		set ram_used $expect_out(2,string)
-	#	puts $ram_used
+		set ram_total $expect_out(2,string)
+		set ram_used $expect_out(3,string)
+		set ram_free $expect_out(4,string)
+		set mem_shared $expect_out(5,string)
+		set mem_buffer $expect_out(6,string)
+		set mem_cached $expect_out(7,string)
 	}
 
-#	puts "ram_used = $ram_used; ram_available = $ram_available; [expr {double($ram_used) / double($ram_available)}]"
+	set effective_ram_used [expr $ram_used - $mem_shared - $mem_buffer - $mem_cached]
 
-	memory_gauge_update [expr {double($ram_used) / double($ram_available)}]
+	expect -re {(Swap:) +([0-9]+) +([0-9]+) +([0-9]+)} {
+		set swap_total $expect_out(2,string)
+		set swap_used $expect_out(3,string)
+		set swap_free $expect_out(4,string)
+	}
+
+	# Update info menu-panel:
+	update_tooltip_menu $ram_used $effective_ram_used $ram_free $mem_shared $mem_buffer $mem_cached $swap_used $swap_free
+
+	# For display, the effective physical RAM utilisation is the important thing (filesystem cache will make room for processes if necessary).
+	memory_gauge_update [expr {double($effective_ram_used) / double($ram_total)}]
 }
 
 
