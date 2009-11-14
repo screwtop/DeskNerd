@@ -6,6 +6,7 @@
 
 # TODO: support multiple drives.  Perhaps use TclRAL for storing the statistics within this program (or just pass them around as parameters).
 # TODO: refactor this!  Most of the gauge code should be defined oncewheres.
+# TODO: figure out how to handle multiple meters with different scales and colour mappings (%util has an upper bound, queue length does not).
 
 # Basic linear gauge indicator
 # A frame, with a smaller frame inside it to act as the gauge?
@@ -95,9 +96,9 @@ proc io_gauge_update {value} {
 	else                         {set gauge_colour green}
 
 	# For queue length: < 1 is OK, more than 2 is def bad.  Give a bit of leeway (1.01 is close enough to 1 to be left green).
-	if     {$value >= 0.5} then {set gauge_colour red} \
-	elseif {$value >= 0.35} then {set gauge_colour orange} \
-	else                         {set gauge_colour green}
+#	if     {$value >= 0.5} then {set gauge_colour red} \
+#	elseif {$value >= 0.35} then {set gauge_colour orange} \
+#	else                         {set gauge_colour green}
 
 	.io_gauge.meter configure -height [expr {$value * ($indicator_height-2)}] -background $gauge_colour
 }
