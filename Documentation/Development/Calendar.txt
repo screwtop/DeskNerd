@@ -1,0 +1,41 @@
+Just thinking idly about how to do calendar stuff for DeskNerd, 2009-11-15.
+
+
+We have a date-time display in the systray already, and I had in mind to add a calendar pop-up object to that.  Some way of conveniently including appointments and deadlines in that would be useful.
+
+What sorts of time-based things might need to be recorded?  Almost everything could conceivably have a timestamp, but not everything is necessarily something you'd need to see in a calendar.  Then again, think of R. Buckminster Fuller's "Chronofile"...
+
+
+One fundamental distinction could be between "instantaneous" events (points in time) vs. things that have a duration.
+
+The ability to break an item down into sub-items with their own (presumably internal) time ranges might be useful.  We may be straying into project management system territory, but maybe that is appropriate/necessary.
+
+How to record dates and times?  A pragmatic approach: don't demand that durations be stored as formal intervals.  One of the biggest annoyances with these systems is that you have to specify precise ending times for everything.  Then again, PostgreSQL's interval support is pretty darn flexible and human-friendly.  It might not be hard to add Tcl front-end processing onto PostgreSQL's existing interval-text-representation.  The sorts of things:
+	hour-long events
+	"all-day" events (which don't really last 24 hours from 00:00:00 to 23:59:59.999...)
+	week-long
+	year-long
+	other approximate durations, such as projects, pregnancies, etc.
+Perhaps some kind of precision indicator for the interval or for each endpoint of the interval would be appropriate.  Indeed, computer timestamp models generally have different subtypes for otherwise incompatible kinds of span.  Perhaps look at the likes of Java and Oracle for examples.
+
+
+
+Design Specifics
+
+
+Types of object:
+	Appointments (formal meetings may have a duration; meeting someone at a certain time and place may have only a time)
+	Events (as distinct from appointments?)
+	Deadlines (due dates are usually instantaneous)
+	Journal entries, system logging, maybe even any sort of communique
+
+
+
+Project Management in General
+	Any item could be part of a project
+	Projects could have subprojects
+	Any project elements could have deadlines, projected completion dates, personnel, attendance, etc.
+	Gantt and PERT chart support
+	Could get complex, but could examine existing systems for good/bad ideas.
+
+
