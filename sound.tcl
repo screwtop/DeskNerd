@@ -11,7 +11,7 @@ set application_name {DeskNerd Sound Meter}
 source {Preferences.tcl}
 source {every.tcl}
 
-set refresh_frequency 10	;# Will just be passed to jack_meter, which will then drive this program's output.
+set refresh_frequency 15	;# Will just be passed to jack_meter, which will then drive this program's output.
 
 # Basic meter dimension preferences:
 set indicator_width 8
@@ -26,8 +26,10 @@ place [frame .sound_gauge.meter     -width [expr {$indicator_width-2}] -height 0
 
 
 # Update the gauge:
-proc sound_gauge_update {decibels} {
+proc sound_gauge_update {decibels raw_rms} {
 	global indicator_height .sound_gauge.meter
+
+#	puts $raw_rms
 
 	# Last 6 dB may get grungy, but 20 dB is commonly considered reasonable headroom, and last 3 dB is "precious", so we'll make that red.
 	# Mind you, jackmeter uses peak-reading metering.  And 14 dB is probably more likely for popular music.  Replay Gain tends to give you -3 dB K-14, with "nominal peaks" around 9 dB K-14, or -6 dB FS (peak).  So, we'll put the orange/green transition at -6 dB here.
@@ -38,7 +40,14 @@ proc sound_gauge_update {decibels} {
 
 	# Map dB peak re. full scale to indicator height.  Perhaps convert to Stevens loudness (better if we had RMS levels to work with).
 #	set value [expr {$decibels / 100.0 + 1}]	;# 100 dB range
-	set value [expr {$decibels / 20 + 1}]
+#	set value [expr {$decibels / 30 + 1}]
+
+;# Now trying RMS and/or Stevens loudness.  Scaling factor of sqrt(2) assumes loudest normal signal would be a full-scale sine wave.  In practice, music RMS levels should be ~14 dB below full-scale.
+	# I've observed 0.26 raw numeric RMS with even Replay Gained material.  Hot masters may reach 0.45 raw numeric RMS, so k = 1.6 should be about right.
+#	set k 1.6	;# For hot, peak-limited commercial music, RMS reaching 0.5 raw numeric RMS.
+	set k 2.5	;# More suitable for Replay Gained or moderately mastered music, RMS reaching no higher than about 0.25.
+	set value [expr {$k * pow($raw_rms, 0.67)}]
+	
 	.sound_gauge.meter configure -height [expr {$value * ($indicator_height-2)}] -background $gauge_colour
 }
 
@@ -47,10 +56,13 @@ proc sound_gauge_update {decibels} {
 log_user 0
 spawn jack_meter -n -f $refresh_frequency
 while true {
-	# "-inf" is a possibility, note!
-	expect -re {(-?[0-9]+\.[0-9]+)} {
+	# "-inf" is a possibility, note!  Maybe should define a variable for a floating-point string literal regular expression (TODO).
+	expect -re {(-?[0-9]+\.[0-9]+)	(-?[0-9]+\.[0-9]+)	(-?[0-9]+\.[0-9]+)} {
 		# 0 -> whole match, 1 -> "Mem:", ...
+		# I've modified jack_meter.c to output Stevens RMS levels as the third number, so let's try using that now.
 		set sound_level_peak $expect_out(1,string)
+		set sound_level_rms $expect_out(2,string)
+		set sound_level_rms_stevens $expect_out(3,string)	;# I guess we could calculate this in this program; the RMS -> Stevens calculation is not happening at Fs after all!
 	}
 
 #	puts $sound_level_peak
@@ -60,7 +72,7 @@ while true {
 	# Update info menu-panel:
 #	update_tooltip_menu $ram_total $ram_used $effective_ram_used $ram_free $effective_ram_free $mem_shared $mem_buffer $mem_cached $swap_total $swap_used $swap_free
 
-	sound_gauge_update $sound_level_peak
+	sound_gauge_update $sound_level_peak $sound_level_rms
 #	sound_gauge_update $sound_level_peak_normalised
 #	sound_gauge_update [expr {$sound_level_peak / 100.0 + 1}]
 }
