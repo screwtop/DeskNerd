@@ -1,0 +1,15 @@
+There are a good many sources of system Ckernel) data in the Linux proc filesystem.  These have the advantage of being generally text-oriented files (easy to open and extract data from), and can be read from as frequently (or infrequently) as you like (although reading more often will add to the system load).  A disadvantage is that counter data may have to be converted to deltas in order to calculate rates.  Another disadvantage is that the structure and content of the proc tree and its files may change.  Also, you can't use expect and its nice features if you're doing file I/O yourself (although Tcl's string handling is, of course, good).
+
+
+Some potentially useful items in the proc filesystem:
+
+/proc/diskstats
+/proc/meminfo
+/proc/vmstat
+/proc/interrupts
+/proc/stat	context switch counters (-> rate)
+
+When using proc, do we have to open the file every time?  Can we open it once and seek to the beginning (or rewind) each time we want to read?
+
+Tcl's [set data [read $file_handle]] idiom slurps the entire file into $data, but that's probably fine here as most proc files are very small.
+
