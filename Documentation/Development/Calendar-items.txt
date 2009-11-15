@@ -1,0 +1,29 @@
+Options and considerations for how to display calendar entries for the current day:
+	A menu with timeslots could be an effective way to do this.
+	Timeslots with only one items can just display the item within the menu label.
+	Can menu items span multiple lines?
+	Timeslots with multiple items could have a submenu for browsing to these.
+	Can menu items contain buttons?
+	The timeslot pattern should be a user preference.  Some options:
+		Only show timeslots that actually contain events (i.e. no pattern).
+		Only show timeslots for certain ranges (e.g. working hours on weekdays).
+		Custom timeslots (e.g. 45-minute timeslots, things starting on the half hour, irregular patterns).
+	Instantaneous events (e.g. deadlines) should show up within the appropriate timeslot (if using a timeslot pattern), otherwise just at the specific time recorded for the event.
+	For single-item timeslots, when showing appointment inline, display minimal useful :1 data, e.g. time, brief description (possibly abbrev'd, somehow), place.
+	Colour coding for items?  A user preference for styles would be good, e.g.
+		Important -> red background, white foreground, bold text, maybe even text size and font.
+		Deadline -> ...
+		Entertainment -> blue bg, white fg
+		(Tk would make all this stuff pretty easy, I have to admit!)
+		(Colour coding would also help distinguish busy timeslots from non-busy)
+
+
+menu .calendar_day_menu
+	.calendar_day_menu add command -label { 9:00} -command {}
+	.calendar_day_menu add command -label {10:00} -command {}
+	.calendar_day_menu add command -label {11:00} -command {}
+	.calendar_day_menu add command -label {12:00} -command {}
+bind . <3> "tk_popup .calendar_day_menu %X %Y"
+
+# Ah, you can determine menu entry indexes using [menu index]:
+	.calendar_day_menu index { 9:00}
