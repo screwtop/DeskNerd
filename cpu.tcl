@@ -1,10 +1,11 @@
-#!/usr/local/bin/wish8.5
+#!/usr/bin/wish
 
 # Modified not to use dstat and just read from /proc instead (potentially faster (i.e. can read more frequently)).
 
 
 # TODO: refactor this!  Most of the gauge code should be defined oncewheres.
 # TODO: sort out the gauge/meter terminology.
+# TODO: figure out how to determine the number of CPUs on the system.  An initial read from /proc/stat might do: just count the number of lines matching /^cpu[0-9]+ /.  But note that [string match] uses patterns!  And think of systems with more than 9 CPUs.
 
 # Basic linear gauge indicator - modified for CPU utilisation monitoring with dstat
 # I think user + system aggregated is probably representative - the meter should be compact.  NOTE: don't just take the idle time and subtract from 100 % - that would treat I/O wait time as busy, which it isn't really IMO.
@@ -61,8 +62,28 @@ proc gauge_update {meter_id value} {
 }
 
 
+# Routine to determine how many logical CPUs are accounted for in the system.
+proc get_num_cpus {} {
+	set num_cpus 0
+	set stat_handle [open "/proc/stat" r]
+	set stat_data [read $stat_handle]
+	close $stat_handle
+	set stat_data [split $stat_data "\n"]
+	foreach line $stat_data {
+		set statistic [lindex $line 0]
+		if [regexp {^cpu[0-9]+$} $statistic] {
+			incr num_cpus
+		}
+	}
+	return $num_cpus
+}
+
+
 # OK, let's go...
 
+puts "CPU count: [get_num_cpus], AFAICT."
+
+# TODO: generalise to n CPUs.
 create_meter cpu0
 create_meter cpu1
 create_meter cpu2
@@ -71,7 +92,7 @@ create_meter cpu3
 # As an alternative to dstat (and since it only retrieves its data from there anyway), perhaps we can just use /proc/stat.  That way, we can query as often as we like (more frequently than 1 Hz, for example).  We could also determined the number of CPUs from that file.  I think the data there is in some kind of continuous counter, in percent/second units.
 
 # Since the /proc/stat data are ongoing counters, we'll need to store the previous readings so we can compute the difference.  I think an array would be sensible.  Have to initialise it first (I think), darnit.
-
+# TODO: generalise to n CPUs.
 set prev_busy_counter(cpu0) 0
 set prev_busy_counter(cpu1) 0
 set prev_busy_counter(cpu2) 0
@@ -105,7 +126,7 @@ every $refresh_interval_ms {
 	foreach line $cpu_data {
 	#	puts "line:<<$line>>"
 		set statistic [lindex $line 0]
-		if [string match "cpu?" $statistic] {
+		if [regexp {^cpu[0-9]+$} $statistic] {
 			set user_counter [lindex $line 1]
 			set nice_counter [lindex $line 2]
 			set syst_counter [lindex $line 3]
