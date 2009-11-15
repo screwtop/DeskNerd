@@ -6,6 +6,7 @@
 # TODO: refactor this!  Most of the gauge code should be defined oncewheres.
 # TODO: sort out the gauge/meter terminology.
 # TODO: figure out how to determine the number of CPUs on the system.  An initial read from /proc/stat might do: just count the number of lines matching /^cpu[0-9]+ /.  But note that [string match] uses patterns!  And think of systems with more than 9 CPUs.
+# TODO: investigate leaving the /proc/stat file open while looping and just rewinding each time we read.  It would probably complicate the logic of the program to ensure it was closed when exiting, though.
 
 # Basic linear gauge indicator - modified for CPU utilisation monitoring with dstat
 # I think user + system aggregated is probably representative - the meter should be compact.  NOTE: don't just take the idle time and subtract from 100 % - that would treat I/O wait time as busy, which it isn't really IMO.
