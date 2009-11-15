@@ -87,15 +87,17 @@ proc io_gauge_update {value} {
 	# We're assuming value is a 0..1 factor.
 	# Colour thresholds?  Overkill to store these in a data structure somewhere?
 	# Green|Red?  Green|Orange|Red?  Green|Yellow|Orange|Red?
-	# Note: yellow is no terribly visible against the default pale grey background.
+	# Note: yellow is not terribly visible against the default pale grey background.
 	# Perhaps a fixed black background would be appropriate.
 	# For % util.:
+	# {{0.5 green} {0.75 yellow} {0.90 orange} {1.0 red}}
 	if     {$value >= 0.90} then {set gauge_colour red} \
 	elseif {$value >= 0.75} then {set gauge_colour orange} \
 	elseif {$value >= 0.50} then {set gauge_colour yellow} \
 	else                         {set gauge_colour green}
 
 	# For queue length: < 1 is OK, more than 2 is def bad.  Give a bit of leeway (1.01 is close enough to 1 to be left green).
+	# {{0.35 green} {0.5 orange} {1.0 red}}
 #	if     {$value >= 0.5} then {set gauge_colour red} \
 #	elseif {$value >= 0.35} then {set gauge_colour orange} \
 #	else                         {set gauge_colour green}
