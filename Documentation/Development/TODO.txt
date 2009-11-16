@@ -1,0 +1,4 @@
+[ ] You can add a title to menus, which is useful for when they are torn off (which is actually a nice feature for the detailed status info menus).  menu -title <title>
+
+[ ] Figure out how to make certain labels in menus bold (e.g. for the application title entries).
+
