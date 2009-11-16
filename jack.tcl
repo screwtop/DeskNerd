@@ -20,6 +20,7 @@ set application_name {DeskNerd JACK Audio Manager}
 
 
 
+
 # The main popup menu:
 pack [menubutton .jack  -text "JACK"  -menu .jack.menu  -relief groove]
 
@@ -29,14 +30,62 @@ menu .popup_menu
 	.popup_menu add command -label {Close}           -command {exit}
 bind . <3> "tk_popup .popup_menu %X %Y"
 
+
+
+# Main menu:
+# Much of this is just mock-up at present.
 menu .jack.menu
 	# Program label menu item first:
 	.jack.menu add command -label $application_name -background grey
 	.jack.menu add separator
 	# Then any info/status non-interactive items:
-
+	.jack.menu add command -label {CPU DSP load: ?? %}
+	.jack.menu add command -label {Sampling Rate: ?? Hz}
+	.jack.menu add command -label {Period Size: ?? frames}
+	.jack.menu add command -label {Periods/Buffer: ??}
+	# Normal commands:
+	.jack.menu add separator
+	.jack.menu add command -label {Refresh Ports}
+	.jack.menu add separator
+	# Output (source) ports first, I think:
+	# TODO: gonna hafta figure out some port name munging to enable them to be used as Tk widget names.
+	.jack.menu add cascade -label {system:capture_1 ->}  -menu .jack.menu.sink_ports
+	.jack.menu add cascade -label {system:capture_2 ->}  -menu .jack.menu.sink_ports
+	# TODO: Separator after system ports, perhaps?
+	.jack.menu add cascade -label {MPlayer [32479]:out_0 ->}  -menu .jack.menu.sink_ports 
+	.jack.menu add cascade -label {MPlayer [32479]:out_1 ->}  -menu .jack.menu.sink_ports 
+	# Input (sink/target) ports:
+	# NOTE: terminal sink ports (which are usually also physical) should not appear in this menu (or at least should not have submenus).
+	.jack.menu add separator
+	.jack.menu add cascade -label {system:playback_1 <-}  -menu .jack.menu.source_ports
+	.jack.menu add cascade -label {system:playback_2 <-}  -menu .jack.menu.source_ports
+#	.jack.menu add separator
+	.jack.menu add cascade -label {jkmeter:in-1 <-}  -menu .jack.menu.source_ports
+	.jack.menu add cascade -label {jkmeter:in-2 <-}  -menu .jack.menu.source_ports
+	# Some testing items:
 	.jack.menu add separator
 	.jack.menu add command -label "List Ports to Console" -command {puts [get_jack_port_list]}
+
+
+
+# Preliminary mocked-up submenus for making/checking JACK port connections.
+# Submenu for output (source/out) ports:
+# TODO: this will have to be programmatically generated.
+menu .jack.menu.source_ports
+	.jack.menu.source_ports add command -label {system:capture_1}
+	.jack.menu.source_ports add command -label {system:capture_2}
+	# TODO: Separator after system ports, perhaps?
+	.jack.menu.source_ports add separator
+	.jack.menu.source_ports add command -label {MPlayer [32479]:out_0}
+	.jack.menu.source_ports add command -label {MPlayer [32479]:out_1}
+
+menu .jack.menu.sink_ports
+	.jack.menu.sink_ports add command -label {system:playback_1}
+	.jack.menu.sink_ports add command -label {system:playback_2}
+	.jack.menu.sink_ports add separator
+	.jack.menu.sink_ports add command -label {jkmeter:in-1}
+	.jack.menu.sink_ports add command -label {jkmeter:in-2}
+
 
 
 
