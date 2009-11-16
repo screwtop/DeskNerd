@@ -92,12 +92,15 @@ proc memory_gauge_update {value} {
 
 
 log_user 0
+set timeout [expr {$refresh_interval_s + 1}]	;# or perhaps * 2.
 spawn free -s $refresh_interval_s
 # Output looks like:
+#<<
 #             total       used       free     shared    buffers     cached
 #Mem:       3933736    3713660     220076          0      47432    1593324
 #-/+ buffers/cache:    2072904    1860832
 #Swap:      2048276      74432    1973844
+#>>
 while true {
 	expect -re {(Mem:) +([0-9]+) +([0-9]+) +([0-9]+) +([0-9]+) +([0-9]+) +([0-9]+)} {
 		# 0 -> whole match, 1 -> "Mem:", ...
@@ -121,11 +124,16 @@ while true {
 		set swap_free $expect_out(4,string)
 	}
 
+#	puts "$ram_used"	;# Just testing...
+
 	# Update info menu-panel:
 	update_tooltip_menu $ram_total $ram_used $effective_ram_used $ram_free $effective_ram_free $mem_shared $mem_buffer $mem_cached $swap_total $swap_used $swap_free
 
 	# For display, the effective physical RAM utilisation is the important thing (filesystem cache will make room for processes if necessary).
 	memory_gauge_update [expr {double($effective_ram_used) / double($ram_total)}]
+
+	# TODO: handle eof properly.
+#	expect eof {break}	;# i.e. not like this, which just causes an expect timeout, since it waits for EOF at every iteration of this while loop.
 }
 
 
