@@ -71,6 +71,8 @@ menu .jack.menu
 # Preliminary mocked-up submenus for making/checking JACK port connections.
 # Submenu for output (source/out) ports:
 # TODO: this will have to be programmatically generated.
+# It will be interesting to see how unwiendly this becomes with clients with many ports (such as Ardour) connected.  I think we'll have to add another level of menus, so you'd have client_x:source_ports:sink_ports and client_x:sink_ports:source_ports.
+# Maybe we don't even need both ways of looking at it: ergonomically, you'd usually have a source, which you find, and then go looking for where you want to send it.  But there may be situations where you'd start with the sink port and then go looking for a source (for setting up a track for recording in Ardour, for example).
 menu .jack.menu.source_ports
 	.jack.menu.source_ports add command -label {system:capture_1}
 	.jack.menu.source_ports add command -label {system:capture_2}
