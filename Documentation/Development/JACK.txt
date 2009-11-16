@@ -1,0 +1,47 @@
+A component I'd find useful would be a tray-based control panel for the JACK Audio Connection Kit.  Something like a lightweight qjackctl.  Some ideas:
+
+ - A menu for connecting ports.  Probably a submenu for playback ports with a submenu for capture ports, and vice versa for connecting capture ports to playback ports.  An arrow character (or text equivalent, e.g. "->") for showing the signal direction would help.  Menu items could be coloured, emboldened, etc. to show their connection status.  Selecting an item would simply toggle its connection status.  A mouse menu model like AmigaDOS would be nice for this, to avoid having to reinvoke the menu to perform multiple actions; oh well.
+ - Icons, colours, or other indications of port properties (e.g. physical, terminal).  These can be found via jack_lsp -p.  Indeed, jack_lsp -p is necessary to tell inputs from outputs.
+ - Run jack_evmon via expect to efficiently watch for changes to ports.
+ - Run jack_lsp when clients register or unregister to get an updated list of port names.
+ - A built-in level meter in the tray (see sound.tcl)
+ - A numeric (or text-based, using a special font) signal indicator for each port built into the menu, so you can see whether a signal is present.
+
+Other thoughts and questions:
+
+ - What to do about port aliases?  jack_lsp -A
+ - It might be appropriate to create a dynamic relational data layer using TclRAL.  This could then be used as the basis for further, higher-level functionality, insulating higher layers from things like running jack_evmon in the background and running jack_lsp and parsing its output.
+
+
+Notes on jack_lsp and jack_evmon for keeping tabs on what ports exist:
+
+<<Client MPlayer [13200] registered>>
+
+# By itself, jack_lsp will list all ports:
+jack_lsp
+
+<<
+MPlayer [13200]:out_0
+MPlayer [13200]:out_1
+>>
+
+# jack_lsp -c will show connections.  This will be necessary to catch existing port connection state for this component.
+jack_lsp -c
+
+<<
+system:playback_1
+   MPlayer [13276]:out_0
+system:playback_2
+   MPlayer [13276]:out_1
+...
+MPlayer [13276]:out_0
+   meter:meter
+system:playback_1
+   MPlayer [13276]:out_1
+system:playback_2
+meter:meter
+   MPlayer [13276]:out_0
+>>
+
+Spaces are obviously permitted in JACK port names; are they permitted at the start?  It could be hard to distinguish between a connected port and a port that has a name beginning with three spaces if so.
+
