@@ -3,14 +3,16 @@
 # NOTE: see also ~/.Xdefaults (Tk honours this file).  
 
 # What sort of font settings?  Mono/Sans/Serif?  Or maybe more specific function-based ones, depending on where it'll appear?  Bold in places?
+# Font stuff across Tk verssions could get complicated (8.5 supports TrueType and antialiasing).
 
 #{-*-cure-*-*-*-*-11-*-*-*-*-*-*-*}	;# Tiny!
 #set font_mono  {}
 # Letter Gothic 12 Pitch, Lucida Sans Typewriter, LucidaTypewriter, Orator, Prestige
-font create font_mono -family cure -size -11	;# Remaps to a bitmap font...
+font create font_mono -family lucidatypewriter -size -12
 
 #set font_sans  {-*-helvetica-medium-r-*-*-11-*-*-*-*-*-*-*}
-font create font_sans -family Helvetica -size -11	;# -size is in what units?  Ah, if negavite, pixels.
+font create font_sans -family Helvetica -size -12	;# -size is in what units?  Ah, if negavite, pixels.
+#font create font_sans -family cure -size -10	;# About as small as it gets.
 #{-*-helvetica-bold-r-*-*-11-*-*-*-*-*-*-*}
 # Optima
 

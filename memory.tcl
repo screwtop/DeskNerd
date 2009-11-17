@@ -12,8 +12,14 @@ set application_name {DeskNerd Memory Meter}
 source {Preferences.tcl}
 # TODO: fixed-width font for menu display
 source {every.tcl}
+source {number_formatting.tcl}
 
 set refresh_interval_s 1	;# Memory utilisation doesn't normally change very rapidly; 1..10 s may be quite OK.
+
+# NOTE: changing the TearOff capability changes the number of items in menus!  Fragile!
+option add *TearOff 1
+# TODO: fixed-width font might be sensible for the informative tooltip-menus.
+#option add *font font_mono
 
 #set ::env(TERM) dumb	;# to avoid ANSI codes from dstat
 
@@ -31,40 +37,46 @@ bind . <3> "tk_popup .popup_menu %X %Y"
 # Extra info menu, tooltip styles.
 # TODO: maybe add total amount of physical RAM and swap.
 # TODO: maybe add % reporting for physical RAM (effective) and swap.
+# TODO: maybe use automatic-multiplier-prefix number formatting (e.g. MiB, TiB) (though consistency is more important, and MiB is generally still fine ca. 2010).
 menu .info_menu
 	.info_menu add command -label $application_name -command {}
 	.info_menu add separator
-	.info_menu add command -label "Total Physical RAM: ??" -command {}
-	.info_menu add command -label "Total Swap: ??" -command {}
+	.info_menu add command -label "Total Physical RAM: ??" -command {} -font font_mono
+	.info_menu add command -label "Total Swap:         ??" -command {} -font font_mono
 	.info_menu add separator
-	.info_menu add command -label "Effective Physical RAM Used: ??" -command {}
-	.info_menu add command -label "Effective Physical RAM Free: ??" -command {}
+	.info_menu add command -label "Effective Physical RAM Used: ??" -command {} -font font_mono
+	.info_menu add command -label "Effective Physical RAM Free: ??" -command {} -font font_mono
 	.info_menu add separator
-	.info_menu add command -label "Shared Mem: ??" -command {}
-	.info_menu add command -label "Buffer Mem: ??" -command {}
-	.info_menu add command -label "System Cache: ??" -command {}
+	.info_menu add command -label "Shared Mem:   ??" -command {} -font font_mono
+	.info_menu add command -label "Buffer Mem:   ??" -command {} -font font_mono
+	.info_menu add command -label "System Cache: ??" -command {} -font font_mono
 	.info_menu add separator
-	.info_menu add command -label "Swap Used: ??" -command {}
-	.info_menu add command -label "Swap Free: ??" -command {}
+	.info_menu add command -label "Swap Used: ??" -command {} -font font_mono
+	.info_menu add command -label "Swap Free: ??" -command {} -font font_mono
 # Could be invoked by mouse-over or left click perhaps.
 bind . <1> "tk_popup .info_menu %X %Y"
 
 proc update_tooltip_menu {ram_total ram_used effective_ram_used ram_free effective_ram_free shared buffer cache swap_total swap_used swap_free} {
 	set i 0	;# Counter for keeping track of menu item indexes.
+	incr i	;# For the tear-off tab (if enabled)!
 	incr i	;# Increment to skip over separator items in the menu.
 	# Seems a bit ridiculous updating the physical RAM every time, but swap could conceivably vary.
-	.info_menu entryconfigure [incr i] -label "Total Physical RAM: [expr {round($ram_total / 1024.0)}] MiB"
-	.info_menu entryconfigure [incr i] -label "Total Swap: [expr {round($swap_total / 1024.0)}] MiB"
+	# Trying out auto-prefix:
+#	.info_menu entryconfigure [incr i] -label "Total Physical RAM: [format_base2_unit $ram_total {%7.2f}]B"
+#	.info_menu entryconfigure [incr i] -label "Total Swap:         [format_base2_unit $swap_total {%7.2f}]B"
+
+	.info_menu entryconfigure [incr i] -label "Total Physical RAM:          [format {%5d} [expr {round($ram_total / 1024.0)}]] MiB"
+	.info_menu entryconfigure [incr i] -label "Total Swap:                  [format {%5d} [expr {round($swap_total / 1024.0)}]] MiB"
 	incr i
-	.info_menu entryconfigure [incr i] -label "Effective Physical RAM Used: [expr {round($effective_ram_used / 1024.0)}] MiB ([expr round($effective_ram_used / double($ram_total) * 100)]%)"
-	.info_menu entryconfigure [incr i] -label "Effective Physical RAM Free: [expr {round(($ram_total - $effective_ram_used) / 1024.0)}] MiB ([expr round($effective_ram_free / double($ram_total) * 100)]%)"	
+	.info_menu entryconfigure [incr i] -label "Effective Physical RAM Used: [format {%5d} [expr {round($effective_ram_used / 1024.0)}]] MiB ([format {%2d} [expr round($effective_ram_used / double($ram_total) * 100)]]%)"
+	.info_menu entryconfigure [incr i] -label "Effective Physical RAM Free: [format {%5d} [expr {round(($ram_total - $effective_ram_used) / 1024.0)}]] MiB ([format {%2d} [expr round($effective_ram_free / double($ram_total) * 100)]]%)"	
 	incr i
-	.info_menu entryconfigure [incr i] -label "Shared: [expr {round($shared / 1024.0)}] MiB"
-	.info_menu entryconfigure [incr i] -label "Buffers: [expr {round($buffer / 1024.0)}] MiB"
-	.info_menu entryconfigure [incr i] -label "System Cache: [expr {round($cache / 1024.0)}] MiB"
+	.info_menu entryconfigure [incr i] -label "Shared:                      [format {%5d} [expr {round($shared / 1024.0)}]] MiB"
+	.info_menu entryconfigure [incr i] -label "Buffers:                     [format {%5d} [expr {round($buffer / 1024.0)}]] MiB"
+	.info_menu entryconfigure [incr i] -label "System Cache:                [format {%5d} [expr {round($cache / 1024.0)}]] MiB"
 	incr i
-	.info_menu entryconfigure [incr i] -label "Swap Used: [expr {round($swap_used / 1024.0)}] MiB ([expr round($swap_used / double($swap_total) * 100)]%)"
-	.info_menu entryconfigure [incr i] -label "Swap Free: [expr {round($swap_free / 1024.0)}] MiB ([expr round($swap_free / double($swap_total) * 100)]%)"
+	.info_menu entryconfigure [incr i] -label "Swap Used:                   [format {%5d} [expr {round($swap_used / 1024.0)}]] MiB ([format {%2d} [expr round($swap_used / double($swap_total) * 100)]]%)"
+	.info_menu entryconfigure [incr i] -label "Swap Free:                   [format {%5d} [expr {round($swap_free / 1024.0)}]] MiB ([format {%2d} [expr round($swap_free / double($swap_total) * 100)]]%)"
 }
 
 
@@ -93,6 +105,7 @@ proc memory_gauge_update {value} {
 
 log_user 0
 set timeout [expr {$refresh_interval_s + 1}]	;# or perhaps * 2.
+# NOTE: may want to consider using "free -b" to use bytes as lowest-common-denominator measure.
 spawn free -s $refresh_interval_s
 # Output looks like:
 #<<
