@@ -82,22 +82,26 @@ proc get_num_cpus {} {
 
 # OK, let's go...
 
-puts "CPU count: [get_num_cpus], AFAICT."
+set ::num_cpus [get_num_cpus]
+puts "DeskNerd CPU Meter: CPU count : ${::num_cpus}."
 
-# TODO: generalise to n CPUs.
-create_meter cpu0
-create_meter cpu1
-create_meter cpu2
-create_meter cpu3
+# Container frame for all CPU meters:
+#frame .gauges -relief sunken -border 1 -padx 1 -pady 1 -background black
+#grid .gauges
+
+# Set up the CPU meters:
+for {set n 0} {$n < $::num_cpus} {incr n} {
+	create_meter cpu${n}
+}
+
 
 # As an alternative to dstat (and since it only retrieves its data from there anyway), perhaps we can just use /proc/stat.  That way, we can query as often as we like (more frequently than 1 Hz, for example).  We could also determined the number of CPUs from that file.  I think the data there is in some kind of continuous counter, in percent/second units.
 
 # Since the /proc/stat data are ongoing counters, we'll need to store the previous readings so we can compute the difference.  I think an array would be sensible.  Have to initialise it first (I think), darnit.
-# TODO: generalise to n CPUs.
-set prev_busy_counter(cpu0) 0
-set prev_busy_counter(cpu1) 0
-set prev_busy_counter(cpu2) 0
-set prev_busy_counter(cpu3) 0
+for {set n 0} {$n < $::num_cpus} {incr n} {
+	set prev_busy_counter(cpu${n}) 0
+}
+
 set prev_timestamp 0
 
 # /proc/stat uses the following line format for CPU counters:
