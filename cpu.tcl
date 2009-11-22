@@ -11,6 +11,7 @@
 # Basic linear gauge indicator - modified for CPU utilisation monitoring with dstat
 # I think user + system aggregated is probably representative - the meter should be compact.  NOTE: don't just take the idle time and subtract from 100 % - that would treat I/O wait time as busy, which it isn't really IMO.
 
+wm overrideredirect . 1
 wm title . {DeskNerd_CPUMeter}
 
 source {Preferences.tcl}
@@ -39,16 +40,16 @@ bind . <3> "tk_popup .popup_menu %X %Y"
 proc create_meter {meter_id} {
 	global indicator_width indicator_height
 	# Container frame
-	pack [frame .${meter_id}_gauge  -width $indicator_width  -height $indicator_height  -relief sunken  -borderwidth 1 -background black] -side left
+	pack [frame .gauges.${meter_id}_gauge  -width $indicator_width  -height $indicator_height  -relief sunken  -borderwidth 1 -background black] -side left
 	
 	# Meter gauge is also done as a frame
-	place [frame .${meter_id}_gauge.meter     -width [expr {$indicator_width-2}] -height 0  -relief flat -borderwidth 0 -background green] -anchor sw -x 0 -y [expr {$indicator_height-2}]
+	place [frame .gauges.${meter_id}_gauge.meter     -width [expr {$indicator_width-2}] -height 0  -relief flat -borderwidth 0 -background green] -anchor sw -x 0 -y [expr {$indicator_height-2}]
 }
 
 
 # Then again, by duplicating this, we can customise the colouring function...
 proc gauge_update {meter_id value} {
-	global indicator_height .${meter_id}_gauge.meter
+	global indicator_height .gauges.${meter_id}_gauge.meter
 	# We're assuming value is a 0..1 factor.
 	# Colour thresholds?  Overkill to store these in a data structure somewhere?
 	# Green|Red?  Green|Orange|Red?  Green|Yellow|Orange|Red?
@@ -59,7 +60,7 @@ proc gauge_update {meter_id value} {
 	elseif {$value >= 0.50} then {set gauge_colour yellow} \
 	else                         {set gauge_colour green}
 
-	.${meter_id}_gauge.meter configure -height [expr {$value * ($indicator_height-2)}] -background $gauge_colour
+	.gauges.${meter_id}_gauge.meter configure -height [expr {$value * ($indicator_height-2)}] -background $gauge_colour
 }
 
 
@@ -86,8 +87,8 @@ set ::num_cpus [get_num_cpus]
 puts "DeskNerd CPU Meter: CPU count : ${::num_cpus}."
 
 # Container frame for all CPU meters:
-#frame .gauges -relief sunken -border 1 -padx 1 -pady 1 -background black
-#grid .gauges
+frame .gauges -relief sunken -border 1 -padx 1 -pady 1 -background black
+grid .gauges
 
 # Set up the CPU meters:
 for {set n 0} {$n < $::num_cpus} {incr n} {
@@ -151,6 +152,12 @@ every $refresh_interval_ms {
 #	puts ""
 }
 
+
+# A bit of fiddling to get layout right in systray (see also overrideredirect at start):
+after 100 {
+	wm minsize . [winfo width .] [winfo height .]
+	wm withdraw .; wm overrideredirect . 0; wm deiconify .
+}
 
 # Endut! Hoch hech!
 
