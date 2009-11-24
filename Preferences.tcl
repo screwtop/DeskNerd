@@ -57,3 +57,7 @@ option add *Cursor hand2 widgetDefault
 
    option add *highlightThickness 0
 
+
+# Always pull in user preferences too, if they exist?
+catch {source ~/.desknerd/global.tcl}
+

@@ -18,10 +18,12 @@
 
 
 wm title . {DeskNerd_Files}
+wm overrideredirect . 1
 
 source {Preferences.tcl}
 option add *TearOff 0
 . configure -background $statusbar_background_colour
+catch {source ~/.desknerd/files.tcl}
 
 pack [menubutton .files      -text "Files" -menu .files.menu -relief groove]
 #pack [menubutton .files      -text "Files" -menu .files.menu -relief groove -background $statusbar_background_colour -foreground $statusbar_foreground_colour]
@@ -37,15 +39,15 @@ bind . <3> "tk_popup .popup_menu %X %Y"
 menu .files.menu
 	# TODO: Also would be sensible to have sub-menus for things like user-defined favourites/shortcuts/bookmarks, recently-used items, etc.  Maybe they should even go in their own top-level menu, actually.  Perhaps these should be stored in a configuration/preferences database somewhere...
 	# Actually, maybe only put "~", "/", and the user's favourites in the top-level menu, and include a submenu for 
-	.files.menu add command -label "/commerce/infosci/Users/cedwards" -command {exec thunar /commerce/infosci/Users/cedwards &}
-	.files.menu add command -label "/mnt/info-nts-12/dbcourses/Info212/www" -command {exec thunar /mnt/info-nts-12/dbcourses/Info212/www &}
+	.files.menu add command -label "/commerce/infosci/Users/cedwards" -command "exec $file_manager /commerce/infosci/Users/cedwards &"
+	.files.menu add command -label "/mnt/info-nts-12/dbcourses/Info212/www" -command "exec $file_manager /mnt/info-nts-12/dbcourses/Info212/www &"
 	.files.menu add separator
 	.files.menu add cascade -menu [menu .files.menu.recent] -label {Recently Used}
 	.files.menu add cascade -menu [menu .files.menu.mounts] -label {Mount Points}
 	.files.menu add separator
 	# Special filesystem points to include at the top:
-	.files.menu add command -label "Filesystem root (/)" -command {exec thunar / &}
-	.files.menu add command -label "Home folder (~)" -command "exec thunar $env(HOME) &"
+	.files.menu add command -label "Filesystem root (/)" -command "exec $file_manager / &"
+	.files.menu add command -label "Home folder (~)" -command "exec $file_manager $env(HOME) &"
 
 # For the file browser menu, we probably want a pseudo-root for each mount point.  I'm not sure if Tcl's "file" API/command allows us to determine mount points, since everything is a local/normal mount, so "/" is the only "volume" it detects.  If we go Linux-only, we can maybe parse /proc/mounts to find these out (filtering out system mount points like /dev/shm, perhaps).
 # The list might need to be refreshable; ideally, would auto-refresh.
@@ -94,10 +96,14 @@ foreach rec $mount_records {
 	# Also, if a device or path contains a ".", it will cause the Tk path to be invalid.
 #	menu .files.menu.$path-[string map {. -} $device]
 	puts "path = $path"
-	.files.menu.mounts add command -label $path -command "exec thunar $path &"
+	.files.menu.mounts add command -label $path -command "exec $file_manager $path &"
 }
 
 
 
 menu .files.menu.test
+
+
+source reset_window.tcl
+reset_window
 

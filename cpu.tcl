@@ -14,21 +14,23 @@
 wm overrideredirect . 1
 wm title . {DeskNerd_CPUMeter}
 
-source {Preferences.tcl}
-source {every.tcl}
-
-# You should pass in the number of CPUs when you call this.
-# TODO: figure out the number of CPUs automatically.
-# TODO: what about hyperthreading/logical CPUs?
-set cpu_count 4
-#set cpu_count [lindex $argv 0]
-set refresh_interval_ms [expr {round(4 / 60.0 * 1000)}]	;# On a system with 1000 Hz timer, this should be good down to 1 ms.  50 is probably a reasonable tradeoff.  Or a multiple of the likely display hardware refresh period.
-
-set ::env(TERM) dumb	;# to avoid ANSI codes from dstat
-
 # Basic meter dimension preferences:
 set indicator_width 8
 set indicator_height 20
+
+set refresh_interval_ms [expr {round(4 / 60.0 * 1000)}]	;# On a system with 1000 Hz timer, this should be good down to 1 ms.  50 is probably a reasonable tradeoff.  Or a multiple of the likely display hardware refresh period.
+
+
+source {Preferences.tcl}
+catch {source ~/.desknerd/cpu.tcl}
+
+
+source {every.tcl}
+
+
+set ::env(TERM) dumb	;# to avoid ANSI codes from dstat
+
+
 
 # Pop-up menu for convenient exiting:
 menu .popup_menu
@@ -153,11 +155,9 @@ every $refresh_interval_ms {
 }
 
 
-# A bit of fiddling to get layout right in systray (see also overrideredirect at start):
-after 100 {
-	wm minsize . [winfo width .] [winfo height .]
-	wm withdraw .; wm overrideredirect . 0; wm deiconify .
-}
+source reset_window.tcl
+reset_window
+
 
 # Endut! Hoch hech!
 

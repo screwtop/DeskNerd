@@ -26,8 +26,11 @@ option add *font font_sans
 # List of devices to monitor:
 # You can include additional devices like sr0 here, which otherwise don't show up.
 # iostat also lets you monitor individual partitions.
+# Getting a list from /sys/block might also be effective.
 # It would be nice to let iostat display everything, but how do we know what meter gauge's we'll need?
-set device_names {sda sdb sdc sdd sde sdf hda sr0 sr1}
+# User preferences/settings file:
+catch {source ~/.desknerd/io.tcl}
+#set device_names {sda sdb sdc sdd sde sdf hda sr0 sr1}
 #set device_names {}
 
 # This works, but with no meters the script will fail.
@@ -136,11 +139,10 @@ proc io_gauge_update {device value} {
 	.gauges.${device}.meter configure -height [expr {$value * ($indicator_height-2)}] -background $gauge_colour
 }
 
-# A bit of fiddling to get layout right in systray (see also overrideredirect at start):
-after 100 {
-	wm minsize . [winfo width .] [winfo height .]
-	wm withdraw .; wm overrideredirect . 0; wm deiconify .
-}
+
+# Ping to systray:
+source reset_window.tcl
+reset_window
 
 
 #stty -echo	;# No, that's for passwords! :)
