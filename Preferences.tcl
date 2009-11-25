@@ -32,6 +32,9 @@ option add *TearOff 0
 option add *font font_sans
 
 
+set ::date_format {%c}	;# Current locale's date format by default
+
+
 # Tone down the bevelling a little (hard to tell which of these do anything much, although the hand2 thing works):
 option add *Menu.relief raised widgetDefault	;# This definitely works (try "sunken" and see).
 option add *MenuButton.background red
@@ -56,4 +59,8 @@ option add *Cursor hand2 widgetDefault
    option add *MenuButton.borderWidth 0
 
    option add *highlightThickness 0
+
+
+# Always pull in user preferences too, if they exist?
+catch {source ~/.desknerd/global.tcl}
 

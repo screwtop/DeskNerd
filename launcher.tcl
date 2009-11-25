@@ -1,16 +1,19 @@
 #!/usr/bin/wish
 
 # TODO: an InstaLauncher to implement single-application launcher buttons a la Windows Quick Launch.  It would take command-line arguments identifying the label, icon (I guess) and command to execute when clicked.  Not sure about how to deal with arranging the buttons - drag n drop prolly out of the question!  NOTE: for icons, see the "options" manual, -bitmap and -compound in particular.
+# TODO: split out some commands (and menu structure and items?) into user preferences file.  Some preferences (e.g. preferred file manager) might be shared among DeskNerd programs.
 
 #package require tile	;# tile
 
 wm title . {DeskNerd_Launcher}
+wm overrideredirect . 1
 
 source {Preferences.tcl}
 #option add *TearOff 0
 #tile::setTheme clam	;# tile
 #ttk::?? clam
 . configure -background $statusbar_background_colour
+catch {source ~/.desknerd/launcher.tcl}
 
 #pack [ttk::menubutton .launch -text "Launch" -menu .launch.menu]	;# tile
 pack [menubutton .launch      -text "Launch" -menu .launch.menu -relief groove -borderwidth 2]
@@ -25,8 +28,8 @@ bind . <3> "tk_popup .popup_menu %X %Y"
 
 # Dummy menu items for now...
 menu .launch.menu
-	.launch.menu add command -label "Shell" -command {exec urxvt -e bash -l &}
-	.launch.menu add command -label "GVim" -command {exec gvim &}
+	.launch.menu add command -label "Shell" -command "exec $terminal &"
+	.launch.menu add command -label "Text Editor" -command "exec $editor &"
 	.launch.menu add separator
 	.launch.menu add cascade -menu [menu .launch.menu.audio] -label {Audio}
 		# Audacity, Ardour, jack, Pure Data
@@ -51,9 +54,13 @@ menu .launch.menu
 
 
 	.launch.menu add separator
-	.launch.menu add command -label "Browse /" -command {exec thunar / &}
-	.launch.menu add command -label "Browse ~" -command "exec thunar $env(HOME) &"
+	.launch.menu add command -label "Browse /" -command "exec $file_manager / &"
+	.launch.menu add command -label "Browse ~" -command "exec $file_manager $env(HOME) &"
 
 # Just thinking: under Ion, ad-hoc launching of applications using point-and-click is probably a rare event: we have a lot of stuff launch at start of session, and other stuff is mostly shells and editors, which can easily be launched from the Ion "Run" menu, or from a new ad-hoc shell (the latter beingnot so good in terms of resource use, but nice to be able to see the application's standard output).  For applications with a well-defined target workspace/frame, can/should we jump to those automatically?  Prolly appropriate.  In fact, duh, just set the jump winprop!  :)
 
+
+# Ping into systray:
+source reset_window.tcl
+reset_window
 

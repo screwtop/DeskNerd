@@ -6,11 +6,12 @@
 # TODO: add a (separate, shareable) proc for converting bytes to MiB, GiB, etc., perhaps automatically according to the magnitude.
 
 
-wm title . {DeskNerd_MemoryMeter}
 set application_name {DeskNerd Memory Meter}
+wm title . $application_name
 
 source {Preferences.tcl}
-# TODO: fixed-width font for menu display
+catch {source ~/.desknerd/memory.tcl}
+
 source {every.tcl}
 source {number_formatting.tcl}
 
