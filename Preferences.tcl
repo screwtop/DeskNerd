@@ -3,15 +3,16 @@
 # NOTE: see also ~/.Xdefaults (Tk honours this file).  
 
 # What sort of font settings?  Mono/Sans/Serif?  Or maybe more specific function-based ones, depending on where it'll appear?  Bold in places?
-# Font stuff across Tk verssions could get complicated (8.5 supports TrueType and antialiasing).
+# Font stuff across Tk versions could get complicated (8.5 supports TrueType and antialiasing).
+# Also, it seems you can't override them once created (e.g. in user preferences). :^(
 
 #{-*-cure-*-*-*-*-11-*-*-*-*-*-*-*}	;# Tiny!
 #set font_mono  {}
 # Letter Gothic 12 Pitch, Lucida Sans Typewriter, LucidaTypewriter, Orator, Prestige
-font create font_mono -family lucidatypewriter -size -12
+#font create font_mono -family lucidatypewriter -size -12
 
 #set font_sans  {-*-helvetica-medium-r-*-*-11-*-*-*-*-*-*-*}
-font create font_sans -family Helvetica -size -12	;# -size is in what units?  Ah, if negavite, pixels.
+#font create font_sans -family Helvetica -size -12	;# -size is in what units?  Ah, if negavite, pixels.
 #font create font_sans -family cure -size -10	;# About as small as it gets.
 #{-*-helvetica-bold-r-*-*-11-*-*-*-*-*-*-*}
 # Optima
@@ -26,7 +27,7 @@ font create font_sans -family Helvetica -size -12	;# -size is in what units?  Ah
 # ion3 statusbar: 0x50 background, 0xa0 text
 set statusbar_background_colour {#505050}
 set statusbar_foreground_colour {#a0a0a0}
-. configure -background $statusbar_background_colour
+. configure -background $statusbar_background_colour	;# Should this go in the individual programs?
 
 option add *TearOff 0
 option add *font font_sans

@@ -28,10 +28,11 @@ option add *font font_sans
 # iostat also lets you monitor individual partitions.
 # Getting a list from /sys/block might also be effective.
 # It would be nice to let iostat display everything, but how do we know what meter gauge's we'll need?
+set device_names {sda sr0}	;# Likely minimum on modern systems.
+#set device_names {}
 # User preferences/settings file:
 catch {source ~/.desknerd/io.tcl}
-#set device_names {sda sdb sdc sdd sde sdf hda sr0 sr1}
-#set device_names {}
+
 
 # This works, but with no meters the script will fail.
 #set device_pattern {([hs][dr][a-z]?[0-9]*)}	;# Default: match any.

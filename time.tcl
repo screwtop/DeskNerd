@@ -13,6 +13,7 @@
 
 wm title . {DeskNerd_Time}
 wm overrideredirect . 1
+#puts [info tclversion]
 
 source {Preferences.tcl}
 option add *TearOff 0
@@ -40,7 +41,7 @@ proc every {ms body} {
 . configure -background $statusbar_background_colour
 # This is where the date and time get displayed:
 # For the date-time display, use a menubutton or just a label?  Perhaps no "-relief groove" for this component - it's essentially read-only, not a button.
-pack [menubutton .time -textvariable date_string -background $statusbar_background_colour -foreground $statusbar_foreground_colour]
+pack [menubutton .time -textvariable date_string -background $statusbar_background_colour -foreground $statusbar_foreground_colour -font font_mono -pady 0.2m -border 0 -relief sunken]
 
 
 menu .popup_menu

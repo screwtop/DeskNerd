@@ -25,7 +25,7 @@ option add *TearOff 0
 . configure -background $statusbar_background_colour
 catch {source ~/.desknerd/files.tcl}
 
-pack [menubutton .files      -text "Files" -menu .files.menu -relief groove]
+pack [menubutton .files      -text "Files" -menu .files.menu -relief groove -pady 0.3m]
 #pack [menubutton .files      -text "Files" -menu .files.menu -relief groove -background $statusbar_background_colour -foreground $statusbar_foreground_colour]
 
 
