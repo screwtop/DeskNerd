@@ -22,6 +22,7 @@ option add *TearOff 1
 # TODO: fixed-width font might be sensible for the informative tooltip-menus.
 option add *font font_sans
 
+set refresh_interval_s 1
 
 # List of devices to monitor:
 # You can include additional devices like sr0 here, which otherwise don't show up.
@@ -30,6 +31,9 @@ option add *font font_sans
 # It would be nice to let iostat display everything, but how do we know what meter gauge's we'll need?
 # User preferences/settings file:
 catch {source ~/.desknerd/io.tcl}
+if {![info exists device_names]} {
+	set device_names {sda hda sr0}	;# Probably a fair stab
+}
 #set device_names {sda sdb sdc sdd sde sdf hda sr0 sr1}
 #set device_names {}
 
@@ -65,16 +69,16 @@ menu .info_menu
 	.info_menu add separator
 	.info_menu add command -label "Device: ??" -command {}
 	.info_menu add separator
-	.info_menu add command -label "% Util.: ??" -command {}
-	.info_menu add command -label "Queue: ??" -command {}
-	.info_menu add command -label "IO/s: ??" -command {}
-	.info_menu add command -label "MB/s: ??" -command {}
+	.info_menu add command -label "% Util.:      ??" -command {} -font font_mono
+	.info_menu add command -label "Queue:        ??" -command {} -font font_mono
+	.info_menu add command -label "IO/s:         ??" -command {} -font font_mono
+	.info_menu add command -label "MB/s:         ??" -command {} -font font_mono
 	.info_menu add separator
-	.info_menu add command -label "Reads/s: ??" -command {}
-	.info_menu add command -label "Writes/s: ??" -command {}
+	.info_menu add command -label "Reads/s:      ??" -command {} -font font_mono
+	.info_menu add command -label "Writes/s:     ??" -command {} -font font_mono
 	.info_menu add separator
-	.info_menu add command -label "Read MB/s: ??" -command {}
-	.info_menu add command -label "Write MB/s: ??" -command {}
+	.info_menu add command -label "Read MB/s:    ??" -command {} -font font_mono
+	.info_menu add command -label "Write MB/s:   ??" -command {} -font font_mono
 # Could be invoked by mouse-over or left click perhaps.
 bind . <1> "tk_popup .info_menu %X %Y"
 
@@ -83,16 +87,16 @@ proc update_tooltip_menu {device util depth reads writes read_mb write_mb} {
 	set i 2
 	.info_menu entryconfigure [incr i] -label "Device: $device"
 	incr i
-	.info_menu entryconfigure [incr i] -label "Util.: [expr {round($util * 100)}] %"
-	.info_menu entryconfigure [incr i] -label "Queue: $depth"
-	.info_menu entryconfigure [incr i] -label "IO/s: [expr {$reads + $writes}]"
-	.info_menu entryconfigure [incr i] -label "MB/s: [expr {$read_mb + $write_mb}]"
+	.info_menu entryconfigure [incr i] -label "Util.:      [format {%4.0f} [expr {$util * 100}]] %"
+	.info_menu entryconfigure [incr i] -label "Queue:      [format {%6.1f} $depth]"
+	.info_menu entryconfigure [incr i] -label "IO/s:       [format {%4.0f} [expr {$reads + $writes}]]"
+	.info_menu entryconfigure [incr i] -label "MB/s:       [format {%6.1f} [expr {$read_mb + $write_mb}]]"
 	incr i
-	.info_menu entryconfigure [incr i] -label "Reads/s: $reads"
-	.info_menu entryconfigure [incr i] -label "Writes/s: $writes"
+	.info_menu entryconfigure [incr i] -label "Reads/s:    [format {%4.0f} $reads]"
+	.info_menu entryconfigure [incr i] -label "Writes/s:   [format {%4.0f} $writes]"
 	incr i
-	.info_menu entryconfigure [incr i] -label "Read MB/s: $read_mb"
-	.info_menu entryconfigure [incr i] -label "Write MB/s: $write_mb"
+	.info_menu entryconfigure [incr i] -label "Read MB/s:  [format {%6.1f} $read_mb]"
+	.info_menu entryconfigure [incr i] -label "Write MB/s: [format {%6.1f} $write_mb]"
 }
 
 
@@ -148,7 +152,7 @@ reset_window
 #stty -echo	;# No, that's for passwords! :)
 log_user 0
 #spawn iostat -x -m 1	;# Simple when no variable args, trickier when with:
-eval [list spawn iostat -x -m 1] [lrange $device_names 0 end]
+eval [list spawn iostat -x -m $refresh_interval_s] [lrange $device_names 0 end]
 # Line format is "sda               0.00     0.00    0.00    0.00     0.00     0.00     0.00     0.00    0.00   0.00   0.00"
 while true {
 	expect -re [concat $device_pattern { +([0-9\.]+) +([0-9\.]+) +([0-9\.]+) +([0-9\.]+) +([0-9\.]+) +([0-9\.]+) +([0-9\.]+) +([0-9\.]+) +([0-9\.]+) +([0-9\.]+) +([0-9\.]+)}] {
