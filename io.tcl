@@ -20,6 +20,9 @@ source {Preferences.tcl}
 # NOTE: changing the TearOff capability changes the number of items in menus!  Fragile!
 option add *TearOff 1
 # TODO: fixed-width font might be sensible for the informative tooltip-menus.
+#font create font_letter_gothic -family {Letter Gothic 12 Pitch} -size 10
+#option add *font font_letter_gothic
+# See Preferences.tcl
 option add *font font_sans
 
 set refresh_interval_s 1
@@ -71,6 +74,7 @@ menu .info_menu
 	.info_menu add separator
 	.info_menu add command -label "% Util.:      ??" -command {} -font font_mono
 	.info_menu add command -label "Queue:        ??" -command {} -font font_mono
+	.info_menu add command -label "Wait:         ??" -command {} -font font_mono
 	.info_menu add command -label "IO/s:         ??" -command {} -font font_mono
 	.info_menu add command -label "MB/s:         ??" -command {} -font font_mono
 	.info_menu add separator
@@ -83,12 +87,13 @@ menu .info_menu
 bind . <1> "tk_popup .info_menu %X %Y"
 
 # Procedure to update the information in the "tooltip" menu.  Ideally this would only be run when necessary, e.g. when actually invoking the menu, but I'm not sure if that's possible.  Actually, having it called from the main expect loop is good in that you can watch the numbers in realtime changing within the menu.  I like.
-proc update_tooltip_menu {device util depth reads writes read_mb write_mb} {
+proc update_tooltip_menu {device util depth wait reads writes read_mb write_mb} {
 	set i 2
 	.info_menu entryconfigure [incr i] -label "Device: $device"
 	incr i
 	.info_menu entryconfigure [incr i] -label "Util.:      [format {%4.0f} [expr {$util * 100}]] %"
 	.info_menu entryconfigure [incr i] -label "Queue:      [format {%6.1f} $depth]"
+	.info_menu entryconfigure [incr i] -label "Wait:       [format {%7.2f} $wait] s"
 	.info_menu entryconfigure [incr i] -label "IO/s:       [format {%4.0f} [expr {$reads + $writes}]]"
 	.info_menu entryconfigure [incr i] -label "MB/s:       [format {%6.1f} [expr {$read_mb + $write_mb}]]"
 	incr i
@@ -166,9 +171,10 @@ while true {
 		set writes_per_second [expr {$expect_out(5,string)}]
 		set read_megabytes_per_second [expr {$expect_out(6,string)}]
 		set write_megabytes_per_second [expr {$expect_out(7,string)}]
+		set average_wait_time_seconds [expr {$expect_out(10,string) / 1000.0}]
 
 		io_gauge_update $device $utilisation
-		update_tooltip_menu $device $utilisation $queue_length $reads_per_second $writes_per_second $read_megabytes_per_second $write_megabytes_per_second
+		update_tooltip_menu $device $utilisation $queue_length $average_wait_time_seconds $reads_per_second $writes_per_second $read_megabytes_per_second $write_megabytes_per_second
 		
 		# A queue length of 1 is fine for a single drive; 2 or higher may be a problem.  I've seen the queue length exceed 400(!) on sbis4079's single drive.
 		# What sort of scaling to use?  Maybe logarithmic?  meter = 1 - (constant ^ queue_length) looks suitable.
