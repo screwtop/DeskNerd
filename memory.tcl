@@ -1,12 +1,15 @@
-#!/usr/bin/expectk
+#!/usr/bin/wish8.5
 
 # Basic memory usage indicator for DeskNerd.  We could show cache, swap, wired, etc. but what we really care about is how much physical RAM is used out of the available physical RAM.
 # Works by spawning Linux's "free" command in repeat-report mode (-s <nsecs>) and parsing its output.
 
-# TODO: add a (separate, shareable) proc for converting bytes to MiB, GiB, etc., perhaps automatically according to the magnitude.
+# I was having problems with the original expect-based version consuming huge amounts of memory over time.  Don't know if it was pipe buffers never being cleared or what, but this is another try using plain Tcl pipe I/O. 2012-08-23.
+
+# TODO: add a (separate, shareable) proc for converting bytes to MiB, GiB, etc., perhaps automatically according to the magnitude.  Or embed a Frink interpreter via TclBlend?! ;^)
 
 
-set application_name {DeskNerd Memory Meter}
+#set application_name {DeskNerd Memory Meter}
+set application_name {DeskNerd_Memory_Meter}
 wm title . $application_name
 
 source {Preferences.tcl}
@@ -15,7 +18,7 @@ catch {source ~/.desknerd/memory.tcl}
 source {every.tcl}
 source {number_formatting.tcl}
 
-set refresh_interval_s 1	;# Memory utilisation doesn't normally change very rapidly; 1..10 s may be quite OK.
+set refresh_interval_s 2	;# Memory utilisation doesn't normally change very rapidly; 1..10 s may be quite OK.
 
 # NOTE: changing the TearOff capability changes the number of items in menus!  Fragile!
 option add *TearOff 1
@@ -57,7 +60,9 @@ menu .info_menu
 # Could be invoked by mouse-over or left click perhaps.
 bind . <1> "tk_popup .info_menu %X %Y"
 
-proc update_tooltip_menu {ram_total ram_used effective_ram_used ram_free effective_ram_free shared buffer cache swap_total swap_used swap_free} {
+#proc update_tooltip_menu {ram_total ram_used effective_ram_used ram_free effective_ram_free shared buffer cache swap_total swap_used swap_free} {
+# }
+proc update_tooltip_menu {} {
 	set i 0	;# Counter for keeping track of menu item indexes.
 	incr i	;# For the tear-off tab (if enabled)!
 	incr i	;# Increment to skip over separator items in the menu.
@@ -66,18 +71,18 @@ proc update_tooltip_menu {ram_total ram_used effective_ram_used ram_free effecti
 #	.info_menu entryconfigure [incr i] -label "Total Physical RAM: [format_base2_unit $ram_total {%7.2f}]B"
 #	.info_menu entryconfigure [incr i] -label "Total Swap:         [format_base2_unit $swap_total {%7.2f}]B"
 
-	.info_menu entryconfigure [incr i] -label "Total Physical RAM:          [format {%5d} [expr {round($ram_total / 1024.0)}]] MiB"
-	.info_menu entryconfigure [incr i] -label "Total Swap:                  [format {%5d} [expr {round($swap_total / 1024.0)}]] MiB"
+	.info_menu entryconfigure [incr i] -label "Total Physical RAM:          [format {%5d} [expr {round($::ram_total / 1024.0)}]] MiB"
+	.info_menu entryconfigure [incr i] -label "Total Swap:                  [format {%5d} [expr {round($::swap_total / 1024.0)}]] MiB"
 	incr i
-	.info_menu entryconfigure [incr i] -label "Effective Physical RAM Used: [format {%5d} [expr {round($effective_ram_used / 1024.0)}]] MiB ([format {%2d} [expr round($effective_ram_used / double($ram_total) * 100)]]%)"
-	.info_menu entryconfigure [incr i] -label "Effective Physical RAM Free: [format {%5d} [expr {round(($ram_total - $effective_ram_used) / 1024.0)}]] MiB ([format {%2d} [expr round($effective_ram_free / double($ram_total) * 100)]]%)"	
+	.info_menu entryconfigure [incr i] -label "Effective Physical RAM Used: [format {%5d} [expr {round($::effective_ram_used / 1024.0)}]] MiB ([format {%2d} [expr round($::effective_ram_used / double($::ram_total) * 100)]]%)"
+	.info_menu entryconfigure [incr i] -label "Effective Physical RAM Free: [format {%5d} [expr {round(($::ram_total - $::effective_ram_used) / 1024.0)}]] MiB ([format {%2d} [expr round($::effective_ram_free / double($::ram_total) * 100)]]%)"	
 	incr i
-	.info_menu entryconfigure [incr i] -label "Shared:                      [format {%5d} [expr {round($shared / 1024.0)}]] MiB"
-	.info_menu entryconfigure [incr i] -label "Buffers:                     [format {%5d} [expr {round($buffer / 1024.0)}]] MiB"
-	.info_menu entryconfigure [incr i] -label "System Cache:                [format {%5d} [expr {round($cache / 1024.0)}]] MiB"
+	.info_menu entryconfigure [incr i] -label "Shared:                      [format {%5d} [expr {round($::mem_shared / 1024.0)}]] MiB"
+	.info_menu entryconfigure [incr i] -label "Buffers:                     [format {%5d} [expr {round($::mem_buffer / 1024.0)}]] MiB"
+	.info_menu entryconfigure [incr i] -label "System Cache:                [format {%5d} [expr {round($::mem_cache / 1024.0)}]] MiB"
 	incr i
-	.info_menu entryconfigure [incr i] -label "Swap Used:                   [format {%5d} [expr {round($swap_used / 1024.0)}]] MiB ([format {%2d} [expr round($swap_used / double($swap_total) * 100)]]%)"
-	.info_menu entryconfigure [incr i] -label "Swap Free:                   [format {%5d} [expr {round($swap_free / 1024.0)}]] MiB ([format {%2d} [expr round($swap_free / double($swap_total) * 100)]]%)"
+	.info_menu entryconfigure [incr i] -label "Swap Used:                   [format {%5d} [expr {round($::swap_used / 1024.0)}]] MiB ([format {%2d} [expr round($::swap_used / double($::swap_total) * 100)]]%)"
+	.info_menu entryconfigure [incr i] -label "Swap Free:                   [format {%5d} [expr {round($::swap_free / 1024.0)}]] MiB ([format {%2d} [expr round($::swap_free / double($::swap_total) * 100)]]%)"
 }
 
 
@@ -104,10 +109,12 @@ proc memory_gauge_update {value} {
 
 
 
-log_user 0
-set timeout [expr {$refresh_interval_s + 1}]	;# or perhaps * 2.
+#log_user 0
+#set timeout [expr {$refresh_interval_s + 1}]	;# or perhaps * 2.
 # NOTE: may want to consider using "free -b" to use bytes as lowest-common-denominator measure.
-spawn free -s $refresh_interval_s
+#spawn free -s $refresh_interval_s
+set input_stream [open [list |free -s $refresh_interval_s] r]
+fconfigure $input_stream -buffering line
 # Output looks like:
 #<<
 #             total       used       free     shared    buffers     cached
@@ -115,41 +122,41 @@ spawn free -s $refresh_interval_s
 #-/+ buffers/cache:    2072904    1860832
 #Swap:      2048276      74432    1973844
 #>>
-while true {
-	expect -re {(Mem:) +([0-9]+) +([0-9]+) +([0-9]+) +([0-9]+) +([0-9]+) +([0-9]+)} {
-		# 0 -> whole match, 1 -> "Mem:", ...
-		set ram_total $expect_out(2,string)
-		set ram_used $expect_out(3,string)
-		set ram_free $expect_out(4,string)
-		set mem_shared $expect_out(5,string)
-		set mem_buffer $expect_out(6,string)
-		set mem_cached $expect_out(7,string)
-	}
 
-	# Since the system will use spare physical memory for filesystem cache, the fs cache doesn't really count towards memory used.
-	# I think I/O buffer memory works similarly (certainly "free" accounts for cache + buffers together).
-	# Shared memory would be fixed, though, I'd think.
-	set effective_ram_used [expr $ram_used - $mem_cached - $mem_buffer]
-	set effective_ram_free [expr $ram_total - $effective_ram_used]
+# Hmm, ideally an atomic read from the input stream from `free` would guarantee one "Mem" and one "Swap" line.
 
-	expect -re {(Swap:) +([0-9]+) +([0-9]+) +([0-9]+)} {
-		set swap_total $expect_out(2,string)
-		set swap_used $expect_out(3,string)
-		set swap_free $expect_out(4,string)
+fileevent $input_stream readable [list read_input $input_stream]
+
+proc read_input {input_stream} {
+	set line [gets $input_stream]
+	# TODO: input stream error/EOF handling!
+
+	if [regexp {Mem: +([0-9]+) +([0-9]+) +([0-9]+) +([0-9]+) +([0-9]+) +([0-9]+)} $line entire_match ::ram_total ::ram_used ::ram_free ::mem_shared ::mem_buffer ::mem_cache] {
+		# Since the system will use spare physical memory for filesystem cache, the fs cache doesn't really count towards memory used.
+		# I think I/O buffer memory works similarly (certainly "free" accounts for cache + buffers together).
+		# Shared memory would be fixed, though, I'd think.
+		set ::effective_ram_used [expr $::ram_used - $::mem_cache - $::mem_buffer]
+		set ::effective_ram_free [expr $::ram_total - $::effective_ram_used]
 	}
+	
+	# Oh, right, we have to do another read...um... or do we? read_input will be called every time there's a new line.
+	regexp {Swap: +([0-9]+) +([0-9]+) +([0-9]+)} $line entire_match ::swap_total ::swap_used ::swap_free
 
 #	puts "$ram_used"	;# Just testing...
 
 	# Update info menu-panel:
-	update_tooltip_menu $ram_total $ram_used $effective_ram_used $ram_free $effective_ram_free $mem_shared $mem_buffer $mem_cached $swap_total $swap_used $swap_free
+	if {[info exists ::ram_total] && [info exists ::swap_total]} {
+		update_tooltip_menu
+#	update_tooltip_menu $::ram_total $::ram_used $::effective_ram_used $::ram_free $::effective_ram_free $::mem_shared $::mem_buffer $::mem_cached $::swap_total $::swap_used $::swap_free
 
 	# For display, the effective physical RAM utilisation is the important thing (filesystem cache will make room for processes if necessary).
-	memory_gauge_update [expr {double($effective_ram_used) / double($ram_total)}]
-
+		memory_gauge_update [expr {double($::effective_ram_used) / double($::ram_total)}]
+	}
 	# TODO: handle eof properly.
 #	expect eof {break}	;# i.e. not like this, which just causes an expect timeout, since it waits for EOF at every iteration of this while loop.
 }
 
+puts "Quitting."
 
 # Endut! Hoch hech!
 
