@@ -23,6 +23,7 @@ wm overrideredirect . 1
 source {Preferences.tcl}
 option add *TearOff 0
 . configure -background $statusbar_background_colour
+set file_manager thunar	;# TODO: should go into global or per-app prefs?
 catch {source ~/.desknerd/files.tcl}
 
 pack [menubutton .files      -text "Files" -menu .files.menu -relief groove]
@@ -44,6 +45,7 @@ menu .files.menu
 	.files.menu add separator
 	.files.menu add cascade -menu [menu .files.menu.recent] -label {Recently Used}
 	.files.menu add cascade -menu [menu .files.menu.mounts] -label {Mount Points}
+	.files.menu add cascade -menu [menu .files.menu.labels] -label {Available Volumes}
 	.files.menu add separator
 	# Special filesystem points to include at the top:
 	.files.menu add command -label "Filesystem root (/)" -command "exec $file_manager / &"
@@ -100,6 +102,11 @@ foreach rec $mount_records {
 }
 
 
+# Place available volume labels into the labels menu:
+foreach label [lsort [glob -directory /dev/disk/by-label -tails *]] {
+	# TODO: might need to mount it too! - add capability.  If auto-mounting, it'll likely be in /media/$label.
+	.files.menu.labels add command -label $label -command "exec $file_manager $/media/$label &"
+}
 
 menu .files.menu.test
 
