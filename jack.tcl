@@ -12,12 +12,25 @@
 # [ ] Perhaps most significantly, we can choose a playback port that we want to monitor (e.g. system:playback_1 and 2 for the main soundcard outputs), query to find all JACK output ports that connect to it, and connect those to this program, so it will display the effective output signal of the entire system!  I'd wondered how I was going to do that.
 
 
-# (We're going to be using expect features, to run expectk, not wish.)
+# We're going to be using expect features, to run expectk, not wish.
+# Note also that expect ofter lags a bit; we have Tcl 8.4 for expect ATM, but 8.5 otherwise.
+
+# TODO: implement a timer loop to keep the stats up-to-date (once a second?), and another (once every 1/n s) for updating the level meter gauge.  Could adapt the following:
+#proc every {ms body} {eval $body; after $ms [info level 0]}
+#set nmax 3
+#every 1000 {puts hello; if {[incr ::nmax -1]<=0} return}
 
 
 wm title . {DeskNerd_JACK}
 set application_name {DeskNerd JACK Audio Manager}
 
+# Woohoo, we now have some (very basic) functionality in TclJACK!
+load /home/cedwards/Documents/Projects/TclJACK/libtcljack.so
+jack_register
+
+source {Preferences.tcl}
+option add *TearOff 1	;# Could be useful to put menus for certain frequency-accessed ports in a tear-off window (probably only if we have a submenu for each client).  Would need to name the tear-offs sensibly.
+. configure -background $statusbar_background_colour
 
 
 
@@ -27,20 +40,25 @@ pack [menubutton .jack  -text "JACK"  -menu .jack.menu  -relief groove]
 # Program management menu on right-click:
 menu .popup_menu
 	# TODO: $application_name
-	.popup_menu add command -label {Close}           -command {exit}
+	.popup_menu add command -label {Connect to JACK}       -command {jack_register}
+	.popup_menu add command -label {Disconnect from JACK}  -command {jack_deregister}
+	.popup_menu add command -label {Close}                 -command {jack_deregister; exit}
 bind . <3> "tk_popup .popup_menu %X %Y"
 
 
 
 # Main menu:
 # Much of this is just mock-up at present.
+# Would be kinda nice to be able to use textvariable with menu items, but I don't think it's supported.
+# TODO: Will need some kind of timer to update the info/status items while the menu is open.
+# TODO: add menu items to allow choosing which ports to monitor.  Could even be output ports (we'd look for all the source ports connected to the output port and attach those to the monitor).
 menu .jack.menu
 	# Program label menu item first:
 	.jack.menu add command -label $application_name -background grey
 	.jack.menu add separator
 	# Then any info/status non-interactive items:
-	.jack.menu add command -label {CPU DSP load: ?? %}
-	.jack.menu add command -label {Sampling Rate: ?? Hz}
+	.jack.menu add command -label "CPU DSP load: [jack_cpuload] %" -command {.jack.menu entryconfigure 3 -label "CPU DSP load: [jack_cpuload] %"}
+	.jack.menu add command -label "Sampling Rate: [jack_samplerate] Hz"
 	.jack.menu add command -label {Period Size: ?? frames}
 	.jack.menu add command -label {Periods/Buffer: ??}
 	# Normal commands:
@@ -73,6 +91,7 @@ menu .jack.menu
 # TODO: this will have to be programmatically generated.
 # It will be interesting to see how unwiendly this becomes with clients with many ports (such as Ardour) connected.  I think we'll have to add another level of menus, so you'd have client_x:source_ports:sink_ports and client_x:sink_ports:source_ports.
 # Maybe we don't even need both ways of looking at it: ergonomically, you'd usually have a source, which you find, and then go looking for where you want to send it.  But there may be situations where you'd start with the sink port and then go looking for a source (for setting up a track for recording in Ardour, for example).
+# TODO: try using checkbutton instead of plain command for these (perhaps use colour and bold as well).
 menu .jack.menu.source_ports
 	.jack.menu.source_ports add command -label {system:capture_1}
 	.jack.menu.source_ports add command -label {system:capture_2}
@@ -80,6 +99,8 @@ menu .jack.menu.source_ports
 	.jack.menu.source_ports add separator
 	.jack.menu.source_ports add command -label {MPlayer [32479]:out_0}
 	.jack.menu.source_ports add command -label {MPlayer [32479]:out_1}
+	.jack.menu.source_ports add separator
+	.jack.menu.source_ports add command -label {Disconnect All}
 
 menu .jack.menu.sink_ports
 	.jack.menu.sink_ports add command -label {system:playback_1}
@@ -87,6 +108,8 @@ menu .jack.menu.sink_ports
 	.jack.menu.sink_ports add separator
 	.jack.menu.sink_ports add command -label {jkmeter:in-1}
 	.jack.menu.sink_ports add command -label {jkmeter:in-2}
+	.jack.menu.sink_ports add separator
+	.jack.menu.sink_ports add command -label {Disconnect All}
 
 
 
