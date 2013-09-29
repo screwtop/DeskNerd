@@ -44,13 +44,36 @@ proc try {script_to_try script_if_failed} {
 
 proc clipboard_updater {} {
 	# Save a copy of the old values so we can detect changes:
-#	set ::clipboard_old_selection_contents $::clipboard_selection_contents
+	set ::clipboard_old_selection_contents $::clipboard_selection_contents
 	set ::primary_old_selection_contents $::primary_selection_contents
 
 	# Grab a copy of the current clipboard and primary selections:
 	# (We have to copy it in order to display it in the GUI)
-	try {set ::clipboard_selection_contents [selection get -selection CLIPBOARD]} {set ::clipboard_selection_contents {}}
-	try {set ::primary_selection_contents [selection get -selection PRIMARY]} {set ::primary_selection_contents {}}
+	# Also, some applications will occasionally set the clipboard to the empty string (when exiting, for example, which is an annoyance that I've noted in the past).  Ignore such changes.
+	try {
+		set new_clipboard [selection get -selection CLIPBOARD]
+		if {$new_clipboard != ""} {
+			set ::clipboard_selection_contents $new_clipboard
+		} else {
+			# Restore the old value:
+			set ::clipboard_selection_contents $::clipboard_old_selection_contents
+		}
+	} {
+		#set ::clipboard_selection_contents {}
+	}
+
+	# Do likewise with PRIMRAY:
+	try {
+		set new_primary [selection get -selection PRIMARY]
+		if {$new_primary != ""} {
+			set ::primary_selection_contents $new_primary
+		} else {
+			# Restore the old value:
+			set ::primary_selection_contents $::primary_old_selection_contents
+		}
+	} {
+		#set ::primary_selection_contents {}
+	}
 
 	# It might be nice to synchronise the two clipboards.  We'd need to tell which was the last one to be changed.
 	# However, it might be reasonable to assume that any software that uses the CLIPBOARD selection is also going to place the contents in the PRIMARY selection as well (certainly GVim and LibreOffice do this).  This makes life much easier:
