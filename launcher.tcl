@@ -13,6 +13,10 @@ source {Preferences.tcl}
 #tile::setTheme clam	;# tile
 #ttk::?? clam
 . configure -background $statusbar_background_colour
+# TODO: put these settings somewhere better:
+set terminal {urxvt -e bash -l}
+set editor {gvim}
+set file_manager {thunar}
 catch {source ~/.desknerd/launcher.tcl}
 
 #pack [ttk::menubutton .launch -text "Launch" -menu .launch.menu]	;# tile
@@ -33,6 +37,9 @@ menu .launch.menu
 	.launch.menu add separator
 	.launch.menu add cascade -menu [menu .launch.menu.audio] -label {Audio}
 		# Audacity, Ardour, jack, Pure Data
+
+	.launch.menu add cascade -menu [menu .launch.menu.database] -label {Database}
+		.launch.menu.database add command -label "psql" -command {exec urxvt  -name psql  -title psql  -e  sudo -u postgres psql &}
 
 	.launch.menu add cascade -menu [menu .launch.menu.graphics] -label {Graphics}
 		.launch.menu.graphics add command -label "GIMP" -command {exec gimp &}

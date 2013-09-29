@@ -104,7 +104,8 @@ foreach rec $mount_records {
 
 # Place available volume labels into the labels menu:
 foreach label [lsort [glob -directory /dev/disk/by-label -tails *]] {
-	# TODO: might need to mount it too! - add capability.  If auto-mounting, it'll likely be in /media/$label.
+	# TODO: might need to mount it too! - add capability.  If auto-mounted, it'll likely be in /media/$label.
+	# It's also quite possible it'll be mounted already in another location.  Examining the by-label symlinks could be one way to identify the real mount point.
 	.files.menu.labels add command -label $label -command "exec $file_manager $/media/$label &"
 }
 
