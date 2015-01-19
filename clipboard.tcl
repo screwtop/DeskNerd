@@ -14,6 +14,8 @@ package require Tk
 #wm overrideredirect . 1
 wm title . {DeskNerd_Clipboard}
 
+source Preferences.tcl
+
 set ::refresh_interval_ms 250
 set ::keep_synced 1
 
