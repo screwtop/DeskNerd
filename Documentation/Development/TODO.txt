@@ -2,3 +2,9 @@
 
 [ ] Figure out how to make certain labels in menus bold (e.g. for the application title entries).
 
+[ ] Add iowait meter to CPU meter.  Maybe coming down from the top of the scale?
+
+[ ] Implement a temperature meter (perhaps textual rather than graphical).  "sensors" or /proc/acpi/thermal_zone/THRM/temperature?
+
+[ ] Implement a battery/power meter.  Could show battery charge, AC/battery power source state, etc.
+
