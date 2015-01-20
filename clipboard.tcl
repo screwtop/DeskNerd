@@ -28,10 +28,26 @@ package require Tk
 #wm overrideredirect . 1
 wm title . {DeskNerd_Clipboard}
 
+set ::debugging false
+
+# Various alert routines for different reasons/severity.  Could maybe use different beep patterns.  Don't forget that there's already a Tcl "error" command to avoid.
+proc alert {message} {
+        puts stderr "\x1b\[31;1m >> ALERT: ${message}\x1b\[0m"; flush stderr
+}
+
+proc warning {message} {
+        puts stderr "\x1b\[33;1m >> WARNING: ${message}\x1b\[0m"; flush stderr
+}
+
+proc debug {message} {
+        if {$::debugging} {puts stderr "\x1b\[35;1m >> DEBUG: $message\x1b\[0m"; flush stderr}
+}
+
+
 # Tolerate absence of tzint:
 if {[catch {package require tzint}]} {
 	set ::doing_qrcodes 0
-	puts stderr "tzint package not found; please install it if you want QR code support."
+	warning "tzint package not found; please install it if you want QR code support."
 } else {
 	set ::doing_qrcodes 1
 }
@@ -44,10 +60,7 @@ set ::clipboard_history_length 99
 
 
 
-set ::debugging false
-proc debug {message} {
-	if {$::debugging} {puts stderr "DEBUG: $message"}
-}
+
 
 set ::clipboard_history [list]
 set ::clipboard_value {}
@@ -187,9 +200,9 @@ proc update_qr_image {data} {
 	# Note that increasing the scale makes encoding significantly slower! :(  Maybe can scale using the image create command instead?  -zoom?
 	# We could have it regenerate the QR code every time the clipboard changes, but that could be quite wasteful. At least run with low CPU priority if doing that.  Alternatively, have it regenerate on demand, when the menu is invoked, although that'll slow down the menu displaying.  Perhaps when you mouse over the main menu button, so it starts before you even click?
 
-	if {[catch {image delete $::qr_image} err]} {puts stderr "update_qr_image: warning: $err"}
+	if {[catch {image delete $::qr_image} err]} {warning "update_qr_image: warning: $err"}
 	set ::qr_image [image create bitmap]
-	if {[catch {set ::qr_image [image create bitmap -data $qr_xbm]} err]} {puts stderr "update_qr_image: error creating bitmap: $err (maybe clipboard contents too large)"}
+	if {[catch {set ::qr_image [image create bitmap -data $qr_xbm]} err]} {warning "update_qr_image: error creating bitmap: $err (maybe clipboard contents too large)"}
 	# TODO: replace puggers hard-coded menu entry index!
 	.clipboard.menu entryconfigure 2 -image $::qr_image
 
