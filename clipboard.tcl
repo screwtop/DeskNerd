@@ -97,6 +97,8 @@ grid .debugging.primary_label   .debugging.primary_contents   -sticky nsew
 grid .debugging.clipboard_label .debugging.clipboard_contents -sticky nsew
 grid configure  .debugging.keep_synced_button -column 1
 
+if {!$::debugging} {wm withdraw .debugging}
+
 set ::qr_image {}
 
 
