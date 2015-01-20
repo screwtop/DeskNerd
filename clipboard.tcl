@@ -107,14 +107,14 @@ proc prompt_load_file_to_clipboard {} {
 # Trayable menubutton is the main interface:
 # NOTE: we probably want to allow tear-off for this menu.
 # TODO: separate submenus for PRIMARY and CLIPBOARD? (and SECONDARY?!)
-pack [menubutton .clipboard -text "Clip" -menu .clipboard.menu]
+pack [menubutton .clipboard -text "Clip" -menu .clipboard.menu -direction above]
 menu .clipboard.menu -tearoff 1
 	.clipboard.menu add command -label "" -command "" -background white	;# entry 1: abbreviated clipboard text
 	.clipboard.menu add command -image $::qr_image -background white	;# entry 2: QR code (NOTE: or -bitmap)
 	set ::qr_menu_index 2
 	.clipboard.menu add separator	;# entry 3: separator
-	.clipboard.menu add command -label "Save clipboard to file\u2026"	;# entry 4
-	.clipboard.menu add command -label "Load file into clipboard\u2026" -command prompt_load_file_to_clipboard	;# entry 5
+	.clipboard.menu add command -label "Load file into clipboard\u2026" -command prompt_load_file_to_clipboard	;# entry 4
+	.clipboard.menu add command -label "Save clipboard to file\u2026"	;# entry 5
 	# TODO: other send mechanisms, such as e-mail, XMPP, SCP, ...?
 
 # TODO: would be nice to be able to copy (or save) the resulting QR image as well, actually...

@@ -2,3 +2,5 @@
 
 [ ] Figure out how to make certain labels in menus bold (e.g. for the application title entries).
 
+[ ] Set -direction above|below|left|right for systray menubuttons according to whether the systray is at the bottom/top/right/left of the screen.  Perhaps even determine where on the screen we are and do it automatically, rather than relying on some kind of setting.
+
