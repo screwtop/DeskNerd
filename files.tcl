@@ -26,7 +26,7 @@ option add *TearOff 0
 set file_manager thunar	;# TODO: should go into global or per-app prefs?
 catch {source ~/.desknerd/files.tcl}
 
-pack [menubutton .files      -text "Files" -menu .files.menu -relief groove -pady 0.3m]
+pack [menubutton .files      -text "Files" -menu .files.menu -direction above -relief groove -borderwidth 2 -pady 0.3m]
 #pack [menubutton .files      -text "Files" -menu .files.menu -relief groove -background $statusbar_background_colour -foreground $statusbar_foreground_colour]
 
 
