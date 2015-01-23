@@ -8,3 +8,18 @@
 
 [ ] Implement a battery/power meter.  Could show battery charge, AC/battery power source state, etc.
 
+[ ] Set -direction above|below|left|right for systray menubuttons according to whether the systray is at the bottom/top/right/left of the screen.  Perhaps even determine where on the screen we are and do it automatically, rather than relying on some kind of setting.
+
+[ ] Have the menu dismissed by a click on the menubutton, if possible.  Can we bind to click and check the menu state?
+
+# Something a bit like:
+bind .clipboard <1> {.clipboard.menu unpost}	;# Not quite: makes the menu single-use!
+.clipboard.menu index active	;# Returns none if nothing selected. Probably not reliable.
+
+# Not quite either: still makes the menu single-use!
+bind .clipboard <1> {
+	if {[.clipboard.menu index active] != "none"} {
+		.clipboard.menu unpost
+	}
+}
+

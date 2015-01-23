@@ -28,10 +28,13 @@ package require Tk
 #wm overrideredirect . 1
 wm title . {DeskNerd_Clipboard}
 
+set ::debugging false
+source debugging.tcl
+
 # Tolerate absence of tzint:
 if {[catch {package require tzint}]} {
 	set ::doing_qrcodes 0
-	puts stderr "tzint package not found; please install it if you want QR code support."
+	warning "tzint package not found; please install it if you want QR code support."
 } else {
 	set ::doing_qrcodes 1
 }
@@ -44,21 +47,42 @@ set ::clipboard_history_length 99
 
 
 
-set ::debugging false
-proc debug {message} {
-	if {$::debugging} {puts stderr "DEBUG: $message"}
-}
+
 
 set ::clipboard_history [list]
 set ::clipboard_value {}
 
-
+# Read and return a file's entire contents:
 proc slurp {filename} {
 	set file_handle [open $filename r]
 	set file_data [read $file_handle]
 	close $file_handle
 	return $file_data
 }
+
+# Overwrite a file with specified contents:
+proc splat {filename data} {
+	set file_handle [open $filename w]
+	puts -nonewline $file_handle $data
+	close $file_handle
+}
+
+# Ah, the DeskNerd clipboard utility is a great opportunity to implement a URL-de-Googl-ifier (take a URL from a Google search result and remove the visit-via-Google nuisance)! (though better yet would be a browser add-on, although it's often when sharing a URL by e-mail that they are most overtly annoying).
+
+proc urlDecode {str} {
+    set specialMap {"[" "%5B" "]" "%5D"}
+    set seqRE {%([0-9a-fA-F]{2})}
+    set replacement {[format "%c" [scan "\1" "%2x"]]}
+    set modStr [regsub -all $seqRE [string map $specialMap $str] $replacement]
+    return [encoding convertfrom utf-8 [subst -nobackslash -novariable $modStr]]
+}; # http://rosettacode.org/wiki/URL_decoding#Tcl
+
+proc degooglify {url} {
+	array set parameter [split [split [lindex [split $url ?] 1] &] {= }]
+	urlDecode $parameter(url)
+}
+
+
 
 # Use this proc to set the canonical clipboard value.
 proc set_clipboard_value {value} {
@@ -89,6 +113,8 @@ grid .debugging.primary_label   .debugging.primary_contents   -sticky nsew
 grid .debugging.clipboard_label .debugging.clipboard_contents -sticky nsew
 grid configure  .debugging.keep_synced_button -column 1
 
+if {!$::debugging} {wm withdraw .debugging}
+
 set ::qr_image {}
 
 
@@ -101,23 +127,39 @@ proc prompt_load_file_to_clipboard {} {
 }
 
 # TODO: save clipboard to file:
-#tk_getSaveFile -title "Filename to save as"
+proc prompt_save_clipboard_to_file {} {
+	set filename [tk_getSaveFile -title "Filename to save as"]
+	# Any checking?
+	splat $filename $::clipboard_value	;#  [clipboard get] or $::clipboard_value?
+}
 
 
 # Trayable menubutton is the main interface:
 # NOTE: we probably want to allow tear-off for this menu.
 # TODO: separate submenus for PRIMARY and CLIPBOARD? (and SECONDARY?!)
-pack [menubutton .clipboard -text "Clip" -menu .clipboard.menu]
+pack [menubutton .clipboard -font "font_sans 8" -text "Clipboard" -menu .clipboard.menu -direction above]
 menu .clipboard.menu -tearoff 1
 	.clipboard.menu add command -label "" -command "" -background white	;# entry 1: abbreviated clipboard text
 	.clipboard.menu add command -image $::qr_image -background white	;# entry 2: QR code (NOTE: or -bitmap)
 	set ::qr_menu_index 2
 	.clipboard.menu add separator	;# entry 3: separator
-	.clipboard.menu add command -label "Save clipboard to file\u2026"	;# entry 4
-	.clipboard.menu add command -label "Load file into clipboard\u2026" -command prompt_load_file_to_clipboard	;# entry 5
+	.clipboard.menu add command -label "De-Google-ify URL" -command {set_clipboard_value [degooglify [clipboard get]]}	;# entry 4
+	.clipboard.menu add separator	;# entry 5: separator
+	.clipboard.menu add command -label "Load file into clipboard\u2026" -command prompt_load_file_to_clipboard	;# entry 6
+	.clipboard.menu add command -label "Save clipboard to file\u2026" -command prompt_save_clipboard_to_file	;# entry 7
 	# TODO: other send mechanisms, such as e-mail, XMPP, SCP, ...?
 
 # TODO: would be nice to be able to copy (or save) the resulting QR image as well, actually...
+
+# Might be nice to indicate when the clipboard has changed:
+proc flash_clipboard_button {} {
+	set old_colour [.clipboard cget -background]
+	after idle {.clipboard configure -background green}
+	after 100 [list .clipboard configure -background $old_colour]
+	unset old_colour
+}
+
+# I even wonder about displaying the shortened clipboard contents in the menubutton, but it'd have to be pretty teensy, and would only make sense for text.
 
 
 
@@ -141,12 +183,16 @@ proc shorten {text} {
 # Use tzint to generate a QR image of the clipboard contents:
 proc update_qr_image {data} {
 	if {!$::doing_qrcodes} {return}
+
+	# How best to deal with excessively long content?  We can't just return, because there might be a previous image left hanging around that should be zeroed out.  We could truncate it, maybe, and still give some of the data in the QR...dangerous though to modify the data without warning the user somehow.
+	# if {[string length $data] > 1800} {???}
+	# Perhaps we could create a blank image initially, and rely on it being overwritten if a new one can be generated.
+
 	# TODO: have it work with empty $data.
 
 	# TODO: maybe a heuristic for setting the scale based on the size of the data? And the available screen real estate?
-	# Perhaps bail if the amount of data exceeds some reasonable threshold.  1800 characters is certainly pushing it on my portrait display at work, at -scale 4.
+	# Perhaps bail if the amount of data exceeds some reasonable threshold.  1800 characters is certainly pushing it on my portrait display at work, at -scale 4.  Also, even before we hit the limit of the library, the Barcode Scanner app for Android starts to struggle with large images.  There is also a size limit specified for QR data, which we could honour.
 	# In the meantime, -scale 4 is probably fine for most uses.
-	# [string length $data]
 #% winfo screenheight .
 #1600
 #% winfo screenwidth .
@@ -159,19 +205,13 @@ proc update_qr_image {data} {
 	# Note that increasing the scale makes encoding significantly slower! :(  Maybe can scale using the image create command instead?  -zoom?
 	# We could have it regenerate the QR code every time the clipboard changes, but that could be quite wasteful. At least run with low CPU priority if doing that.  Alternatively, have it regenerate on demand, when the menu is invoked, although that'll slow down the menu displaying.  Perhaps when you mouse over the main menu button, so it starts before you even click?
 
-	#set qr_image [image create bitmap -data $qr_xbm]
-	# Regenerating and having the new version display?  Can we replace the existing image?  Do we have to create a new one (and destroy the old one)?  What happens if we delete an image that's being used in a label or menu item?
-	# [image names] lists the names (including some system ones).
-
-	if {[catch {image delete $::qr_image} err]} {puts stderr "update_qr_image: warning: $err"}
-	set ::qr_image [image create bitmap -data $qr_xbm]
-#	.qrcode configure -image $::qr_image
-#	.clipboard.menu add command -image $::qr_image
-#	.clipboard.menu entryconfigure 3 -background white
+	if {[catch {image delete $::qr_image} err]} {warning "update_qr_image: warning: $err"}
+	set ::qr_image [image create bitmap]
+	if {[catch {set ::qr_image [image create bitmap -data $qr_xbm]} err]} {warning "update_qr_image: error creating bitmap: $err (maybe clipboard contents too large)"}
 	# TODO: replace puggers hard-coded menu entry index!
 	.clipboard.menu entryconfigure 2 -image $::qr_image
 
-	unset qr_xbm
+	unset -nocomplain qr_xbm
 }
 
 # This now in ~/.tclshrc
@@ -188,6 +228,8 @@ proc clipboard_updater {} {
 	set ::clipboard_old_selection_contents $::clipboard_selection_contents
 	set ::primary_old_selection_contents $::primary_selection_contents
 
+	set something_changed false
+
 	# Grab a copy of the current clipboard and primary selections:
 	# (We have to copy it in order to display it in the GUI)
 	# Also, some applications will occasionally set the clipboard to the empty string (when exiting, for example, which is an annoyance that I've noted in the past).  Ignore such changes.
@@ -195,6 +237,7 @@ proc clipboard_updater {} {
 		set new_clipboard [selection get -selection CLIPBOARD]
 		if {$new_clipboard != ""} {
 			set ::clipboard_selection_contents $new_clipboard
+			if {$new_clipboard != $::clipboard_old_selection_contents} {set something_changed true}
 		} else {
 			# Restore the old value:
 			set ::clipboard_selection_contents $::clipboard_old_selection_contents
@@ -208,6 +251,7 @@ proc clipboard_updater {} {
 		set new_primary [selection get -selection PRIMARY]
 		if {$new_primary != ""} {
 			set ::primary_selection_contents $new_primary
+			if {$new_primary != $::primary_old_selection_contents} {set something_changed true}
 		} else {
 			# Restore the old value:
 			set ::primary_selection_contents $::primary_old_selection_contents
@@ -221,8 +265,11 @@ proc clipboard_updater {} {
 	# It might be nice to synchronise the two clipboards.  We'd need to tell which was the last one to be changed, and of course they might both have changed (probably due to the same client updating them simltaneously).
 	# However, it might be reasonable to assume that any software that uses the CLIPBOARD selection is also going to place the contents in the PRIMARY selection as well (certainly GVim and LibreOffice do this (actually, no, LibreOffice at work doesn't seem to!)).  This makes life much easier:
 	if {$::primary_old_selection_contents != $::primary_selection_contents} {
+		set something_changed true
+
 		debug " * \"$::primary_selection_contents\""
 		# TODO: log somewhere?
+
 		# Also optionally copy to the CLIPBOARD selection:
 		if $::keep_synced {
 			set ::clipboard_selection_contents $::primary_selection_contents
@@ -232,6 +279,10 @@ proc clipboard_updater {} {
 			set_clipboard_value $::primary_selection_contents
 		}
 	}
+
+	# TODO: try to put this earlier, because generating the QR image takes quite a while.
+	if {$something_changed} {flash_clipboard_button}
+
 	after $::refresh_interval_ms {clipboard_updater}
 }
 
