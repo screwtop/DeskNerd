@@ -4,7 +4,7 @@
 # CME 2012-09-19
 
 
-# On X11, we have the complication that there isn't just one clipboard.  X clients are required to handle at least the PRIMARY, SECONDARY, and CLIPBOARD selections.
+# On X11, we have the complication that there isn't just one clipboard.  X clients are required to handle at least the PRIMARY, SECONDARY, and CLIPBOARD selections (although I believe the SECONDARY selection is seldom used).
 
 # It looks like the ICCCM actually anticipates running a client dedicated to managing clipboard data, e.g. to preserve their contents even if the client from which the data originated terminates. xclipboard is such a program. There is provision for a client to assert ownership of the CLIPBOARD selection.
 # http://tronche.com/gui/x/icccm/sec-2.html#s-2.6.1
@@ -43,14 +43,91 @@ source Preferences.tcl
 
 set ::refresh_interval_ms 250
 set ::keep_synced 1
-set ::clipboard_history_length 99
-
+set ::clipboard_history_length 99	;# TODO: honour this (in set_clipboard_value below)
 
 
 
 
 set ::clipboard_history [list]
 set ::clipboard_value {}
+
+# IIUC, this regains control over the CLIPBOARD selection, copying what the other application had put there when it took ownership.  This seems much nicer than my original timed checking.
+# To have this work with the PRIMARY selection as well...?
+proc readclip {} {
+	after 50 {
+		puts [set cnt [clipboard get]]
+		clipboard clear
+		clipboard append $cnt
+		selection own -command readclip -selection CLIPBOARD .	;# TODO: add -type, -format
+		selection handle . [list string range $cnt]
+	}
+};# http://stackoverflow.com/questions/18211181/tcl-tk-observing-clipboard
+
+#selection own -command readclip -selection CLIPBOARD .
+
+# Test callback for when we own the selection.
+proc selection_handler {offset size_limit} {
+	puts stderr "selection_handler: offset=$offset, size_limit=$size_limit, returning <<$::clipboard_value>>"
+	return $::clipboard_value
+}
+
+# TODO: a global variable indicating whether we own the selection? Or can we use [selection own]
+proc own_selection {} {return [expr {[selection own] == {.}}]}
+
+# Retake ownership of the specified selection, copying wh
+# What about clients that simultaneously set both CLIPBOARD and PRIMARY?
+proc reown_selection {SELECTION} {
+	puts stderr "Lost selection $SELECTION! Will re-take ownership..."
+	after 1000 {
+		set_clipboard_value [selection get -selection $SELECTION]
+		selection own -command [list reown_selection $SELECTION] -selection $SELECTION .
+		selection handle -selection $SELECTION . selection_handler
+	}
+}
+
+# Bah, PRIMARY isn't getting properly reowned..will try separate procs:
+# Ah, it might be due to the use of [after] - those $SELECTION variable references might not be being preserved properly!
+
+# One nuisance is that taking ownership of the selection causes the highlighting in the original client window to vanish. More importantly, the delays here should be big enough not to disturb things like triple-clicking to highlight an entire line in a terminal window. Each incremental increase in the selection range causes a new ownership of the selection, but if we take ownership before the n-clicking has finished, the selection will be lost from the other window before it can be properly made.
+
+proc reown_primary {} {
+	puts stderr "reowning PRIMARY selection"
+	if {[selection own -selection PRIMARY] == {.}} {return}
+#	puts stderr [selection get -selection PRIMARY]
+	after 800 {
+		catch {set_clipboard_value [selection get -selection PRIMARY]}
+		selection own -command reown_primary -selection PRIMARY .
+		selection handle -selection PRIMARY . selection_handler
+	}
+}
+
+proc reown_clipboard {} {
+	puts stderr "reowning CLIPBOARD selection"
+	if {[selection own -selection CLIPBOARD] == {.}} {return}
+#	puts stderr [selection get -selection CLIPBOARD]
+	after 800 {
+		catch {set_clipboard_value [selection get -selection CLIPBOARD]}
+		selection own -command reown_clipboard -selection CLIPBOARD .
+		selection handle -selection CLIPBOARD . selection_handler
+	}
+}
+
+# I don't think we can tell anything much about the client we lost the selection to.
+
+#selection own -command lost_selection -selection PRIMARY .
+#selection handle -selection PRIMARY . selection_handler
+
+
+# TODO: When starting up, we should check both CLIPBOARD and PRIMARY before we take ownership, in case there's something there that needs to be preserved. What if both have a value?!
+
+# Do the same for the CLIPBOARD selection:
+#foreach SELECTION {PRIMARY CLIPBOARD} {
+#	selection own -command [list reown_selection $SELECTION] -selection $SELECTION .
+#	selection handle -selection $SELECTION . selection_handler
+#}
+
+reown_primary
+reown_clipboard
 
 # Read and return a file's entire contents:
 proc slurp {filename} {
@@ -70,16 +147,31 @@ proc splat {filename data} {
 # Ah, the DeskNerd clipboard utility is a great opportunity to implement a URL-de-Googl-ifier (take a URL from a Google search result and remove the visit-via-Google nuisance)! (though better yet would be a browser add-on, although it's often when sharing a URL by e-mail that they are most overtly annoying).
 
 proc urlDecode {str} {
-    set specialMap {"[" "%5B" "]" "%5D"}
-    set seqRE {%([0-9a-fA-F]{2})}
-    set replacement {[format "%c" [scan "\1" "%2x"]]}
-    set modStr [regsub -all $seqRE [string map $specialMap $str] $replacement]
-    return [encoding convertfrom utf-8 [subst -nobackslash -novariable $modStr]]
+	set specialMap {"[" "%5B" "]" "%5D"}
+	set seqRE {%([0-9a-fA-F]{2})}
+	set replacement {[format "%c" [scan "\1" "%2x"]]}
+	set modStr [regsub -all $seqRE [string map $specialMap $str] $replacement]
+	return [encoding convertfrom utf-8 [subst -nobackslash -novariable $modStr]]
 }; # http://rosettacode.org/wiki/URL_decoding#Tcl
 
 proc degooglify {url} {
 	array set parameter [split [split [lindex [split $url ?] 1] &] {= }]
-	urlDecode $parameter(url)
+	# Need to gracefully bail if $url is not actually a Google search result link.
+	if {[array names parameter url] == "url"} {
+		set result [urlDecode $parameter(url)]
+	} else {
+		set result $url
+	}
+	array unset parameter
+	return $result
+#	if {[catch {return [urlDecode $parameter(url)]}]} {
+#		return $url
+#	}
+	# TODO: um, array unset parameter?
+}
+
+proc defacebookify {url} {
+	urlDecode [urlDecode [lindex [split $url /] end]]
 }
 
 
@@ -87,9 +179,11 @@ proc degooglify {url} {
 # Use this proc to set the canonical clipboard value.
 proc set_clipboard_value {value} {
 	set ::clipboard_value $value
+	flash_clipboard_button
 	# TODO: check [llength $::clipboard_history] against $::clipboard_history_length and prune if necessary.
 	lappend ::clipboard_history $value
 	# Do we write it back using [clipboard append] and/or [selection ...]?  Or is it just for display?
+	# No, we should own the PRIMARY (and CLIPBOARD?) selections.
 
 	# Update GUI components as well:
 	.clipboard.menu entryconfigure 1 -label [shorten $value]
@@ -143,10 +237,11 @@ menu .clipboard.menu -tearoff 1
 	.clipboard.menu add command -image $::qr_image -background white	;# entry 2: QR code (NOTE: or -bitmap)
 	set ::qr_menu_index 2
 	.clipboard.menu add separator	;# entry 3: separator
-	.clipboard.menu add command -label "De-Google-ify URL" -command {set_clipboard_value [degooglify [clipboard get]]}	;# entry 4
-	.clipboard.menu add separator	;# entry 5: separator
-	.clipboard.menu add command -label "Load file into clipboard\u2026" -command prompt_load_file_to_clipboard	;# entry 6
-	.clipboard.menu add command -label "Save clipboard to file\u2026" -command prompt_save_clipboard_to_file	;# entry 7
+	.clipboard.menu add command -label "De-Facebook-ify URL" -command {set_clipboard_value [defacebookify [clipboard get]]}	;# entry 4
+	.clipboard.menu add command -label "De-Google-ify URL" -command {set_clipboard_value [degooglify [clipboard get]]}	;# entry 5
+	.clipboard.menu add separator	;# entry 4: separator
+	.clipboard.menu add command -label "Load file into clipboard\u2026" -command prompt_load_file_to_clipboard	;# entry 7
+	.clipboard.menu add command -label "Save clipboard to file\u2026" -command prompt_save_clipboard_to_file	;# entry 8
 	# TODO: other send mechanisms, such as e-mail, XMPP, SCP, ...?
 
 # TODO: would be nice to be able to copy (or save) the resulting QR image as well, actually...
@@ -221,7 +316,12 @@ proc try {script_to_try script_if_failed} {
 	}
 }
 
-# Also, should we own one of the selection units (as xclipboard does, I believe)?  I think we probably should.  Would need [selection own] and to define a command usable for [selection handle ...].
+
+# The clipboard_updater routine tries to synchronise the CLIPBOARD and PRIMARY selections (cos that's always been an annoyance, IMO).  Actually, I don't think this should be necessary: it's better if we claim ownership of both those selections, and re-gain them if we lose them (preserving the contents of what the other client just put there). Of course, running multiple such programs will result in squabbles and bad behaviour.
+
+# Also, should we own one (or both) of the selection units (as xclipboard does, I believe)?  I think we probably should.  Would need [selection own] and to define a command usable for [selection handle ...].  Note that if we do own a selection, we should not bother getting that selection for the current clipboard_updater run!
+
+# Note that we can't prevent ownership of a selection from being taken away from us (but we can periodically/frequently take it back! - ideally we'd detect if we lost it, copy what the other program added into our main clipboard variable, and take ownership again so that the effect is the same).
 
 proc clipboard_updater {} {
 	# Save a copy of the old values so we can detect changes:
@@ -231,7 +331,7 @@ proc clipboard_updater {} {
 	set something_changed false
 
 	# Grab a copy of the current clipboard and primary selections:
-	# (We have to copy it in order to display it in the GUI)
+	# (We have to copy it in order to display it in the GUI - no -textvariable possible here)
 	# Also, some applications will occasionally set the clipboard to the empty string (when exiting, for example, which is an annoyance that I've noted in the past).  Ignore such changes.
 	try {
 		set new_clipboard [selection get -selection CLIPBOARD]
@@ -260,7 +360,7 @@ proc clipboard_updater {} {
 		#set ::primary_selection_contents {}
 	}
 
-	# TODO: what about the SECONDARY selection?
+	# TODO: what about the SECONDARY selection? IIUC, it's basically never used.
 
 	# It might be nice to synchronise the two clipboards.  We'd need to tell which was the last one to be changed, and of course they might both have changed (probably due to the same client updating them simltaneously).
 	# However, it might be reasonable to assume that any software that uses the CLIPBOARD selection is also going to place the contents in the PRIMARY selection as well (certainly GVim and LibreOffice do this (actually, no, LibreOffice at work doesn't seem to!)).  This makes life much easier:
@@ -287,5 +387,5 @@ proc clipboard_updater {} {
 }
 
 
-clipboard_updater
+#clipboard_updater
 
