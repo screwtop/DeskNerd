@@ -13,6 +13,8 @@
 # selection clear | get | handle | own
 # clipboard clear | append | get
 
+# TODO: preserve existing CLIPBOARD (and/or PRIMARY) value.
+# TODO: fix race condition with the button flashing?
 # TODO: (optionally) keep the PRIMARY and CLIPBOARD selections synchronised.  Or maybe always do it, cos it'll make the UI and updating logic simpler.
 # TODO: implement multiple clip units like on the Amiga or in xclipboard?
 # TODO: facility for saving clipboard to a file (and loading too?).
@@ -41,10 +43,10 @@ if {[catch {package require tzint}]} {
 
 source Preferences.tcl
 
-set ::refresh_interval_ms 250
+set ::refresh_interval_ms 250	;# No longer used with selection ownership approach.
+set ::selection_copy_delay 800	;# Length of time after another client takes ownership before we take it back and copy the value. This should be long enough that e.g. triple-clicking in a terminal window still works.
 set ::keep_synced 1
 set ::clipboard_history_length 99	;# TODO: honour this (in set_clipboard_value below)
-
 
 
 
@@ -72,17 +74,24 @@ proc selection_handler {offset size_limit} {
 }
 
 # TODO: a global variable indicating whether we own the selection? Or can we use [selection own]
+# Um, don't we need to specify WHICH selection?!
 proc own_selection {} {return [expr {[selection own] == {.}}]}
+
 
 # Retake ownership of the specified selection, copying wh
 # What about clients that simultaneously set both CLIPBOARD and PRIMARY?
+
 proc reown_selection {SELECTION} {
+#	puts stderr "SELECTION = $SELECTION"
+	catch {set_clipboard_value [selection get -selection $SELECTION]}
+	selection own -command [list schedule_reown_selection $SELECTION] -selection $SELECTION .
+	selection handle -selection $SELECTION . selection_handler
+}
+
+# This is just a wrapper around reown_selection with a delay
+proc schedule_reown_selection {SELECTION} {
 	puts stderr "Lost selection $SELECTION! Will re-take ownership..."
-	after 1000 {
-		set_clipboard_value [selection get -selection $SELECTION]
-		selection own -command [list reown_selection $SELECTION] -selection $SELECTION .
-		selection handle -selection $SELECTION . selection_handler
-	}
+	after $::selection_copy_delay [list reown_selection $SELECTION]
 }
 
 # Bah, PRIMARY isn't getting properly reowned..will try separate procs:
@@ -90,27 +99,6 @@ proc reown_selection {SELECTION} {
 
 # One nuisance is that taking ownership of the selection causes the highlighting in the original client window to vanish. More importantly, the delays here should be big enough not to disturb things like triple-clicking to highlight an entire line in a terminal window. Each incremental increase in the selection range causes a new ownership of the selection, but if we take ownership before the n-clicking has finished, the selection will be lost from the other window before it can be properly made.
 
-proc reown_primary {} {
-	puts stderr "reowning PRIMARY selection"
-	if {[selection own -selection PRIMARY] == {.}} {return}
-#	puts stderr [selection get -selection PRIMARY]
-	after 800 {
-		catch {set_clipboard_value [selection get -selection PRIMARY]}
-		selection own -command reown_primary -selection PRIMARY .
-		selection handle -selection PRIMARY . selection_handler
-	}
-}
-
-proc reown_clipboard {} {
-	puts stderr "reowning CLIPBOARD selection"
-	if {[selection own -selection CLIPBOARD] == {.}} {return}
-#	puts stderr [selection get -selection CLIPBOARD]
-	after 800 {
-		catch {set_clipboard_value [selection get -selection CLIPBOARD]}
-		selection own -command reown_clipboard -selection CLIPBOARD .
-		selection handle -selection CLIPBOARD . selection_handler
-	}
-}
 
 # I don't think we can tell anything much about the client we lost the selection to.
 
@@ -126,8 +114,9 @@ proc reown_clipboard {} {
 #	selection handle -selection $SELECTION . selection_handler
 #}
 
-reown_primary
-reown_clipboard
+reown_selection PRIMARY
+reown_selection CLIPBOARD
+
 
 # Read and return a file's entire contents:
 proc slurp {filename} {
