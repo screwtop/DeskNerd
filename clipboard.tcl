@@ -13,7 +13,8 @@
 # selection clear | get | handle | own
 # clipboard clear | append | get
 
-# TODO: preserve existing CLIPBOARD (and/or PRIMARY) value.
+# TODO: figure out how to deal with certain clients that use the PRIMARY selection when editing text (e.g. gvim's Find dialog, all Tk text/entry widgets!). It's annoying if you're selecting text to edit it and the selection vanishes from underneath you!
+# DONE: preserve existing CLIPBOARD (and/or PRIMARY) value (by owning the respective selection).
 # TODO: fix race condition with the button flashing?
 # TODO: (optionally) keep the PRIMARY and CLIPBOARD selections synchronised.  Or maybe always do it, cos it'll make the UI and updating logic simpler.
 # TODO: implement multiple clip units like on the Amiga or in xclipboard?
@@ -25,6 +26,7 @@
 # TODO: handle tzint failure, e.g. "can't read "qr_xbm": no such variable"
 # TODO: tweak [shorten] so that it doesn't just return "..." if the clipboard contents starts with a line break.
 
+# WTF: I'm seeing periodic requests for the clipboard contents that I don't believe are originating from this program's behaviour...
 
 package require Tk
 #wm overrideredirect . 1
@@ -67,22 +69,32 @@ proc readclip {} {
 
 #selection own -command readclip -selection CLIPBOARD .
 
-# Test callback for when we own the selection.
+# This callback returns the current value of our own internal clipboard variable, for when we own the selection.
+# TODO: is it a problem that the size_limit argument is in bytes, but we're calculating the range using characters?
 proc selection_handler {offset size_limit} {
-	puts stderr "selection_handler: offset=$offset, size_limit=$size_limit, returning <<$::clipboard_value>>"
-	return $::clipboard_value
+	# Debugging:
+	debug "selection_handler: offset=$offset, size_limit=$size_limit, from <<$::clipboard_value>>"
+#	set result [string range $::clipboard_value $offset [expr {$offset + $size_limit - 1}]]
+#	debug "selection_handler: result = <<$result>>"
+#	return $result
+	# Really it's a one-liner (and could be in-lined in the [selection own], but it makes debugging easier, and procs are bytecoded.
+	return [string range $::clipboard_value $offset [expr {$offset + $size_limit - 1}]]
 }
 
 # TODO: a global variable indicating whether we own the selection? Or can we use [selection own]
 # Um, don't we need to specify WHICH selection?!
-proc own_selection {} {return [expr {[selection own] == {.}}]}
-
+# How to name this so that it implies a boolean/question? "is_selection_owned"? "query_..."?
+proc own_selection {SELECTION} {return [expr {[selection own -selection $SELECTION] == {.}}]}
+# Um, does checking ownership with [selection own] also cause the selection handler to run?! I'm seeing it run more often than expected.
 
 # Retake ownership of the specified selection, copying wh
-# What about clients that simultaneously set both CLIPBOARD and PRIMARY?
+# What about clients that "simultaneously" set both CLIPBOARD and PRIMARY? gvim is one example. Firefox seems to do reasonably sensible things too.  I think the upshot is that we re-own both in rapid succession, slightly redundantly.
 
 proc reown_selection {SELECTION} {
-#	puts stderr "SELECTION = $SELECTION"
+	debug "SELECTION = $SELECTION"
+	# TODO: check for and honour preference for owning a particular selection (it might ultimately not make sense to own the PRIMARY selection, unfortunately).
+	# NODE: we don't have any way of knowing if the selection has been owned by another client since this was last run. Most of the time, we simply end up copying it back to ourself!  Actually, that probably is silly: we have the "lost selection" callback, which could set a flag...oh, and there's [selection own] which allows you to check.
+	if {[own_selection $SELECTION]} {return}
 	catch {set_clipboard_value [selection get -selection $SELECTION]}
 	selection own -command [list schedule_reown_selection $SELECTION] -selection $SELECTION .
 	selection handle -selection $SELECTION . selection_handler
@@ -90,7 +102,7 @@ proc reown_selection {SELECTION} {
 
 # This is just a wrapper around reown_selection with a delay
 proc schedule_reown_selection {SELECTION} {
-	puts stderr "Lost selection $SELECTION! Will re-take ownership..."
+	debug "Lost selection $SELECTION! Will re-take ownership..."
 	after $::selection_copy_delay [list reown_selection $SELECTION]
 }
 
@@ -114,8 +126,8 @@ proc schedule_reown_selection {SELECTION} {
 #	selection handle -selection $SELECTION . selection_handler
 #}
 
-reown_selection PRIMARY
-reown_selection CLIPBOARD
+#reown_selection PRIMARY
+#reown_selection CLIPBOARD
 
 
 # Read and return a file's entire contents:
@@ -159,6 +171,7 @@ proc degooglify {url} {
 	# TODO: um, array unset parameter?
 }
 
+# Likewise for redirects via Facebook:
 proc defacebookify {url} {
 	urlDecode [urlDecode [lindex [split $url /] end]]
 }
@@ -168,7 +181,9 @@ proc defacebookify {url} {
 # Use this proc to set the canonical clipboard value.
 proc set_clipboard_value {value} {
 	set ::clipboard_value $value
+	debug "New clipboard value = $::clipboard_value"
 	flash_clipboard_button
+	catch {exec beep -f 256 -l 8}	;# Not run in background, in case of overlap.
 	# TODO: check [llength $::clipboard_history] against $::clipboard_history_length and prune if necessary.
 	lappend ::clipboard_history $value
 	# Do we write it back using [clipboard append] and/or [selection ...]?  Or is it just for display?
@@ -201,6 +216,9 @@ if {!$::debugging} {wm withdraw .debugging}
 set ::qr_image {}
 
 
+
+# Facilities for saving clipboard to and loading from external files:
+
 proc prompt_load_file_to_clipboard {} {
 	set filename [tk_getOpenFile -title "Load text file to clipboard"]
 	if {![file exists $filename]} {return}
@@ -209,7 +227,6 @@ proc prompt_load_file_to_clipboard {} {
 	set_clipboard_value [clipboard get]
 }
 
-# TODO: save clipboard to file:
 proc prompt_save_clipboard_to_file {} {
 	set filename [tk_getSaveFile -title "Filename to save as"]
 	# Any checking?
@@ -235,13 +252,20 @@ menu .clipboard.menu -tearoff 1
 
 # TODO: would be nice to be able to copy (or save) the resulting QR image as well, actually...
 
+
+
+
 # Might be nice to indicate when the clipboard has changed:
 proc flash_clipboard_button {} {
 	set old_colour [.clipboard cget -background]
-	after idle {.clipboard configure -background green}
-	after 100 [list .clipboard configure -background $old_colour]
+#	after idle {.clipboard configure -background green}
+	.clipboard configure -background green
+#	after 150 [list .clipboard configure -background $old_colour]
+	after 150
+	.clipboard configure -background $old_colour
 	unset old_colour
 }
+
 
 # I even wonder about displaying the shortened clipboard contents in the menubutton, but it'd have to be pretty teensy, and would only make sense for text.
 
@@ -377,4 +401,15 @@ proc clipboard_updater {} {
 
 
 #clipboard_updater
+
+
+# When starting up, check for existing data in CLIPBOARD and PRIMARY, and make sure those are preserved.
+# If both have a value, choose one? Concatenate? Choose the longer one?  Just choose CLIPBOARD?
+# TODO: catch, perhaps?
+catch {set_clipboard_value [selection get -selection CLIPBOARD]}
+catch {set_clipboard_value [selection get -selection PRIMARY]}
+
+reown_selection PRIMARY
+reown_selection CLIPBOARD
+
 
