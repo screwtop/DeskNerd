@@ -9,24 +9,29 @@
 # It looks like the ICCCM actually anticipates running a client dedicated to managing clipboard data, e.g. to preserve their contents even if the client from which the data originated terminates. xclipboard is such a program. There is provision for a client to assert ownership of the CLIPBOARD selection.
 # http://tronche.com/gui/x/icccm/sec-2.html#s-2.6.1
 
-# In Tcl/Tk:
-# selection clear | get | handle | own
-# clipboard clear | append | get
+# The original design of this program used periodic checking for changes in the CLIPBOARD and PRIMARY selections, but now it tries to own both of those (and re-take ownership if lost).  This allows for a simpler, more reliable implementation, and allows content to be preserved even after the original client terminates, but couuld cause bad interactions with other programs that try to do the same, and unfortunately, taking ownership of the PRIMARY selection causes the original selected text to become unselected.  This makes things like triple-clicking (which extends the selection incrementally, re-owning each time) and basic editing in clients that use the PRIMARY selection not work properly.
 
-# TODO: figure out how to deal with certain clients that use the PRIMARY selection when editing text (e.g. gvim's Find dialog, all Tk text/entry widgets!). It's annoying if you're selecting text to edit it and the selection vanishes from underneath you!
-# DONE: preserve existing CLIPBOARD (and/or PRIMARY) value (by owning the respective selection).
+# TODO: figure out how to deal with certain clients that use the PRIMARY selection when editing text (e.g. gvim's Find dialog, all Tk text/entry widgets!). It's annoying if you're selecting text to edit it and the selection vanishes from underneath you! We might just have to not own PRIMARY. :(
+# DONE: preserve existing CLIPBOARD (and/or PRIMARY) value (by copying before owning the respective selection).
 # TODO: fix race condition with the button flashing?
-# TODO: (optionally) keep the PRIMARY and CLIPBOARD selections synchronised.  Or maybe always do it, cos it'll make the UI and updating logic simpler.
+# TODO: (optionally) keep the PRIMARY and CLIPBOARD selections synchronised.  Or maybe always do it, cos it'll make the UI and updating logic simpler.  Or, perhaps just offer separate options to own PRIMARY, CLIPBOARD, and perhaps SECONDARY.
 # TODO: implement multiple clip units like on the Amiga or in xclipboard?
-# TODO: facility for saving clipboard to a file (and loading too?).
+# DONE: facility for saving clipboard to a file (and loading too?).
 # TODO: maybe even record a permanent history of all clipboard events in a database.  Could make for interesting (if highly sensitive) archaeology.
-# TODO: truncate the display of the clipboard data (one line only, max n chars).
-# TODO: QR code display of clipboard data (using say tzint). Should it appear as an image in the menu, or perhaps just as a pop-up-on-mouse-over image.
-# TODO: convert to using a menubutton for docking into the statusbar/systray.
-# TODO: handle tzint failure, e.g. "can't read "qr_xbm": no such variable"
+# DONE (pending refinements): truncate the display of the clipboard data (one line only, max n chars).
 # TODO: tweak [shorten] so that it doesn't just return "..." if the clipboard contents starts with a line break.
+# DONE (apart from tooltip): QR code display of clipboard data (using say tzint). Should it appear as an image in the menu, or perhaps just as a pop-up-on-mouse-over image.
+# DONE: convert to using a menubutton for docking into the statusbar/systray.
+# TODO: handle tzint failure, e.g. "can't read "qr_xbm": no such variable"
 
 # WTF: I'm seeing periodic requests for the clipboard contents that I don't believe are originating from this program's behaviour...
+# ...turns out it's Adobe Reader (version 9 on Linux). Every 1.7 seconds it reads from CLIPBOARD. Weird.
+
+# One nuisance is that taking ownership of the selection causes the highlighting in the original client window to vanish. More importantly, the delays here should be big enough not to disturb things like triple-clicking to highlight an entire line in a terminal window. Each incremental increase in the selection range causes a new ownership of the selection, but if we take ownership before the n-clicking has finished, the selection will be lost from the other window before it can be properly made.
+
+# I don't think we can tell anything much about the client we lost the selection to.
+
+
 
 package require Tk
 #wm overrideredirect . 1
@@ -51,12 +56,14 @@ set ::keep_synced 1
 set ::clipboard_history_length 99	;# TODO: honour this (in set_clipboard_value below)
 
 
-
 set ::clipboard_history [list]
 set ::clipboard_value {}
 
+
+
 # IIUC, this regains control over the CLIPBOARD selection, copying what the other application had put there when it took ownership.  This seems much nicer than my original timed checking.
 # To have this work with the PRIMARY selection as well...?
+# NOTE: this isn't actually being used, it was just used as a basis for reown_selection below.
 proc readclip {} {
 	after 50 {
 		puts [set cnt [clipboard get]]
@@ -81,53 +88,29 @@ proc selection_handler {offset size_limit} {
 	return [string range $::clipboard_value $offset [expr {$offset + $size_limit - 1}]]
 }
 
-# TODO: a global variable indicating whether we own the selection? Or can we use [selection own]
-# Um, don't we need to specify WHICH selection?!
+# The own_selection procedure simply returns whether we own the specified selection. (no need for a global variable for this, since we can check it so easily directly, using [selection own].)
 # How to name this so that it implies a boolean/question? "is_selection_owned"? "query_..."?
 proc own_selection {SELECTION} {return [expr {[selection own -selection $SELECTION] == {.}}]}
-# Um, does checking ownership with [selection own] also cause the selection handler to run?! I'm seeing it run more often than expected.
+# Um, does checking ownership with [selection own] also cause the selection handler to run?! I'm seeing it run more often than expected. No, that was due to Adobe Reader being weird.
 
-# Retake ownership of the specified selection, copying wh
-# What about clients that "simultaneously" set both CLIPBOARD and PRIMARY? gvim is one example. Firefox seems to do reasonably sensible things too.  I think the upshot is that we re-own both in rapid succession, slightly redundantly.
-
+# The reown_selection procedure (re-)gains ownership of the specified selection, copying what was there into our own internal clipboard variable, so that it can provided via both CLIPBOARD and PRIMARY.
+# What about clients that "simultaneously" set both CLIPBOARD and PRIMARY? gvim is one example. Firefox seems to do reasonably sensible things too.  I think the upshot is that we re-own both in rapid succession, slightly redundantly, so not really a problem.
 proc reown_selection {SELECTION} {
 	debug "SELECTION = $SELECTION"
 	# TODO: check for and honour preference for owning a particular selection (it might ultimately not make sense to own the PRIMARY selection, unfortunately).
-	# NODE: we don't have any way of knowing if the selection has been owned by another client since this was last run. Most of the time, we simply end up copying it back to ourself!  Actually, that probably is silly: we have the "lost selection" callback, which could set a flag...oh, and there's [selection own] which allows you to check.
+	# NOTE: we don't have any way of knowing if the selection has been owned by another client since this was last run. Most of the time, we simply end up copying it back to ourself!  Actually, that probably is silly: we have the "lost selection" callback, which could set a flag...oh, and there's [selection own] which allows you to check.
 	if {[own_selection $SELECTION]} {return}
 	catch {set_clipboard_value [selection get -selection $SELECTION]}
 	selection own -command [list schedule_reown_selection $SELECTION] -selection $SELECTION .
 	selection handle -selection $SELECTION . selection_handler
 }
 
-# This is just a wrapper around reown_selection with a delay
+# This is just a wrapper around reown_selection with a delay, so that things like triple-clicking (hopefully) aren't disturbed.
 proc schedule_reown_selection {SELECTION} {
 	debug "Lost selection $SELECTION! Will re-take ownership..."
 	after $::selection_copy_delay [list reown_selection $SELECTION]
 }
 
-# Bah, PRIMARY isn't getting properly reowned..will try separate procs:
-# Ah, it might be due to the use of [after] - those $SELECTION variable references might not be being preserved properly!
-
-# One nuisance is that taking ownership of the selection causes the highlighting in the original client window to vanish. More importantly, the delays here should be big enough not to disturb things like triple-clicking to highlight an entire line in a terminal window. Each incremental increase in the selection range causes a new ownership of the selection, but if we take ownership before the n-clicking has finished, the selection will be lost from the other window before it can be properly made.
-
-
-# I don't think we can tell anything much about the client we lost the selection to.
-
-#selection own -command lost_selection -selection PRIMARY .
-#selection handle -selection PRIMARY . selection_handler
-
-
-# TODO: When starting up, we should check both CLIPBOARD and PRIMARY before we take ownership, in case there's something there that needs to be preserved. What if both have a value?!
-
-# Do the same for the CLIPBOARD selection:
-#foreach SELECTION {PRIMARY CLIPBOARD} {
-#	selection own -command [list reown_selection $SELECTION] -selection $SELECTION .
-#	selection handle -selection $SELECTION . selection_handler
-#}
-
-#reown_selection PRIMARY
-#reown_selection CLIPBOARD
 
 
 # Read and return a file's entire contents:
@@ -178,7 +161,7 @@ proc defacebookify {url} {
 
 
 
-# Use this proc to set the canonical clipboard value.
+# The set_clipboard_value proc is for setting the canonical (internal) clipboard value, to be shared by both CLIPBOARD and PRIMARY selections when other clients ask for those.
 proc set_clipboard_value {value} {
 	set ::clipboard_value $value
 	debug "New clipboard value = $::clipboard_value"
@@ -195,6 +178,9 @@ proc set_clipboard_value {value} {
 
 	return [llength $::clipboard_history]
 }
+
+
+# TODO: make this debugging stuff work again (or get rid of it):
 
 toplevel .debugging
 label .debugging.primary_label -justify right -anchor e -text {PRIMARY selection:}
@@ -274,6 +260,7 @@ proc flash_clipboard_button {} {
 # TODO: pop-up menu for control of the Clipboard program itself.
 # ...
 
+
 # Shorten clipboard contents for display in menu (max one line, max n chars).
 # Should this proc also set the global variable used for the abbreviated clipboard string?  Oh, unfortunately, I don't think you can use a variable as the source of text for a menu item.  The menubutton has -textvariable, but not the menu or its items. :(
 proc shorten {text} {
@@ -293,28 +280,36 @@ proc update_qr_image {data} {
 	if {!$::doing_qrcodes} {return}
 
 	# How best to deal with excessively long content?  We can't just return, because there might be a previous image left hanging around that should be zeroed out.  We could truncate it, maybe, and still give some of the data in the QR...dangerous though to modify the data without warning the user somehow.
-	# if {[string length $data] > 1800} {???}
+
 	# Perhaps we could create a blank image initially, and rely on it being overwritten if a new one can be generated.
 
 	# TODO: have it work with empty $data.
 
 	# TODO: maybe a heuristic for setting the scale based on the size of the data? And the available screen real estate?
 	# Perhaps bail if the amount of data exceeds some reasonable threshold.  1800 characters is certainly pushing it on my portrait display at work, at -scale 4.  Also, even before we hit the limit of the library, the Barcode Scanner app for Android starts to struggle with large images.  There is also a size limit specified for QR data, which we could honour.
+
 	# In the meantime, -scale 4 is probably fine for most uses.
 #% winfo screenheight .
 #1600
 #% winfo screenwidth .
 #1200
+	# Potential performance optimisation: We currently have it regenerate the QR code every time the clipboard changes, but that could be quite wasteful. At least run with low CPU priority if doing that.  Alternatively, have it regenerate on demand, when the menu is invoked, although that'll slow down the menu displaying.  Perhaps when you mouse over the main menu button, so it starts before you even click?
 
-	# Note: Barcode Scanner app for Android does not work with black border (-box is for L and R black mattes, -bind is for T and B).
-	# tzint::Encode bits | eps | svg | xbm varName data ?-option value ...?
-	tzint::Encode xbm qr_xbm $data -symbology qrcode -bind false -box false -border 4 -scale 4
 
-	# Note that increasing the scale makes encoding significantly slower! :(  Maybe can scale using the image create command instead?  -zoom?
-	# We could have it regenerate the QR code every time the clipboard changes, but that could be quite wasteful. At least run with low CPU priority if doing that.  Alternatively, have it regenerate on demand, when the menu is invoked, although that'll slow down the menu displaying.  Perhaps when you mouse over the main menu button, so it starts before you even click?
-
-	if {[catch {image delete $::qr_image} err]} {warning "update_qr_image: warning: $err"}
+	# Start by removing the existing image (regardless of whether the new text is too big for a new image)
+	catch {image delete $::qr_image}
 	set ::qr_image [image create bitmap]
+	# Or is it more efficient to re-use a Tk image and just update it to be empty?
+
+	# Only bother creating the new QR image if it's not unreasonably big.
+	if {[string length $data] <= 1800} {
+		# Note: Barcode Scanner app for Android does not work with black border (-box is for L and R black mattes, -bind is for T and B).
+		# tzint::Encode bits | eps | svg | xbm varName data ?-option value ...?
+		tzint::Encode xbm qr_xbm $data -symbology qrcode -bind false -box false -border 4 -scale 4
+
+		# Note that increasing the scale makes encoding significantly slower! :(  Maybe can scale using the image create command instead?  -zoom?
+	}
+
 	if {[catch {set ::qr_image [image create bitmap -data $qr_xbm]} err]} {warning "update_qr_image: error creating bitmap: $err (maybe clipboard contents too large)"}
 	# TODO: replace puggers hard-coded menu entry index!
 	.clipboard.menu entryconfigure 2 -image $::qr_image
