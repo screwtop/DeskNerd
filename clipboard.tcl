@@ -51,7 +51,7 @@ if {[catch {package require tzint}]} {
 source Preferences.tcl
 
 set ::refresh_interval_ms 250	;# No longer used with selection ownership approach.
-set ::selection_copy_delay 800	;# Length of time after another client takes ownership before we take it back and copy the value. This should be long enough that e.g. triple-clicking in a terminal window still works.
+set ::selection_copy_delay 700	;# Length of time after another client takes ownership before we take it back and copy the value. This should be long enough that e.g. triple-clicking in a terminal window still works.
 set ::keep_synced 1
 set ::clipboard_history_length 99	;# TODO: honour this (in set_clipboard_value below)
 
@@ -100,13 +100,22 @@ proc reown_selection {SELECTION} {
 	# TODO: check for and honour preference for owning a particular selection (it might ultimately not make sense to own the PRIMARY selection, unfortunately).
 	# NOTE: we don't have any way of knowing if the selection has been owned by another client since this was last run. Most of the time, we simply end up copying it back to ourself!  Actually, that probably is silly: we have the "lost selection" callback, which could set a flag...oh, and there's [selection own] which allows you to check.
 	if {[own_selection $SELECTION]} {return}
-	catch {set_clipboard_value [selection get -selection $SELECTION]}
+	# Notify user that we've grabbed a selection (regardless of whether it's changing:
+	flash_clipboard_button
+	catch {exec beep -f 512 -l 8}	;# Not run in background, in case of overlap.
+	# Only go through the whole set_clipboard_value process if it's actually changed. This avoids excessive work in regenerating the QR code, and also redundant work (and perhaps user notifications such as beep/flash? it's a bit weird having it beep twice) for clients that set both CLIPBOARD and PRIMARY.
+	set new_clipboard_value {}
+	catch {set new_clipboard_value [selection get -selection $SELECTION]}
+	if {$new_clipboard_value != $::clipboard_value} {
+		catch {set_clipboard_value [selection get -selection $SELECTION]}
+	}
 	selection own -command [list schedule_reown_selection $SELECTION] -selection $SELECTION .
 	selection handle -selection $SELECTION . selection_handler
 }
 
 # This is just a wrapper around reown_selection with a delay, so that things like triple-clicking (hopefully) aren't disturbed.
 proc schedule_reown_selection {SELECTION} {
+	catch {exec beep -f 256 -l 8}
 	debug "Lost selection $SELECTION! Will re-take ownership..."
 	after $::selection_copy_delay [list reown_selection $SELECTION]
 }
@@ -165,8 +174,6 @@ proc defacebookify {url} {
 proc set_clipboard_value {value} {
 	set ::clipboard_value $value
 	debug "New clipboard value = $::clipboard_value"
-	flash_clipboard_button
-	catch {exec beep -f 256 -l 8}	;# Not run in background, in case of overlap.
 	# TODO: check [llength $::clipboard_history] against $::clipboard_history_length and prune if necessary.
 	lappend ::clipboard_history $value
 	# Do we write it back using [clipboard append] and/or [selection ...]?  Or is it just for display?
