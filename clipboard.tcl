@@ -40,6 +40,9 @@ wm title . {DeskNerd_Clipboard}
 set ::debugging false
 source debugging.tcl
 
+# TODO: honour this
+set ::do_beep false
+
 # Tolerate absence of tzint:
 if {[catch {package require tzint}]} {
 	set ::doing_qrcodes 0
@@ -85,6 +88,7 @@ proc selection_handler {offset size_limit} {
 #	debug "selection_handler: result = <<$result>>"
 #	return $result
 	# Really it's a one-liner (and could be in-lined in the [selection own], but it makes debugging easier, and procs are bytecoded.
+	catch {exec beep -f 384 -l 8}
 	return [string range $::clipboard_value $offset [expr {$offset + $size_limit - 1}]]
 }
 
@@ -250,13 +254,12 @@ menu .clipboard.menu -tearoff 1
 
 # Might be nice to indicate when the clipboard has changed:
 proc flash_clipboard_button {} {
-	set old_colour [.clipboard cget -background]
-#	after idle {.clipboard configure -background green}
-	.clipboard configure -background green
-#	after 150 [list .clipboard configure -background $old_colour]
-	after 150
-	.clipboard configure -background $old_colour
-	unset old_colour
+	.clipboard configure -background green -foreground white
+	after 150 {
+		.clipboard configure \
+			-background [lindex [.clipboard configure -background] 3] \
+			-foreground [lindex [.clipboard configure -foreground] 3]
+	}
 }
 
 
