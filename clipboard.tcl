@@ -79,6 +79,15 @@ proc readclip {} {
 
 #selection own -command readclip -selection CLIPBOARD .
 
+
+proc beep {frequency duration} {
+	if {[info exists ::do_beep] && $::do_beep} {
+		if {[catch [list exec beep -f $frequency -l $duration] err]} {
+			puts stderr $err
+		}
+	}
+}
+
 # This callback returns the current value of our own internal clipboard variable, for when we own the selection.
 # TODO: is it a problem that the size_limit argument is in bytes, but we're calculating the range using characters?
 proc selection_handler {offset size_limit} {
@@ -88,7 +97,7 @@ proc selection_handler {offset size_limit} {
 #	debug "selection_handler: result = <<$result>>"
 #	return $result
 	# Really it's a one-liner (and could be in-lined in the [selection own], but it makes debugging easier, and procs are bytecoded.
-	catch {exec beep -f 384 -l 8}
+	beep 384 8
 	return [string range $::clipboard_value $offset [expr {$offset + $size_limit - 1}]]
 }
 
@@ -106,7 +115,7 @@ proc reown_selection {SELECTION} {
 	if {[own_selection $SELECTION]} {return}
 	# Notify user that we've grabbed a selection (regardless of whether it's changing:
 	flash_clipboard_button
-	catch {exec beep -f 512 -l 8}	;# Not run in background, in case of overlap.
+	beep 512 8
 	# Only go through the whole set_clipboard_value process if it's actually changed. This avoids excessive work in regenerating the QR code, and also redundant work (and perhaps user notifications such as beep/flash? it's a bit weird having it beep twice) for clients that set both CLIPBOARD and PRIMARY.
 	set new_clipboard_value {}
 	catch {set new_clipboard_value [selection get -selection $SELECTION]}
@@ -119,7 +128,7 @@ proc reown_selection {SELECTION} {
 
 # This is just a wrapper around reown_selection with a delay, so that things like triple-clicking (hopefully) aren't disturbed.
 proc schedule_reown_selection {SELECTION} {
-	catch {exec beep -f 256 -l 8}
+	beep 256 8
 	debug "Lost selection $SELECTION! Will re-take ownership..."
 	after $::selection_copy_delay [list reown_selection $SELECTION]
 }
