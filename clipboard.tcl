@@ -97,6 +97,7 @@ proc selection_handler {offset size_limit} {
 #	debug "selection_handler: result = <<$result>>"
 #	return $result
 	# Really it's a one-liner (and could be in-lined in the [selection own], but it makes debugging easier, and procs are bytecoded.
+	flash_clipboard_button green white
 	beep 384 8
 	return [string range $::clipboard_value $offset [expr {$offset + $size_limit - 1}]]
 }
@@ -114,7 +115,7 @@ proc reown_selection {SELECTION} {
 	# NOTE: we don't have any way of knowing if the selection has been owned by another client since this was last run. Most of the time, we simply end up copying it back to ourself!  Actually, that probably is silly: we have the "lost selection" callback, which could set a flag...oh, and there's [selection own] which allows you to check.
 	if {[own_selection $SELECTION]} {return}
 	# Notify user that we've grabbed a selection (regardless of whether it's changing:
-	flash_clipboard_button
+	flash_clipboard_button orange white
 	beep 512 8
 	# Only go through the whole set_clipboard_value process if it's actually changed. This avoids excessive work in regenerating the QR code, and also redundant work (and perhaps user notifications such as beep/flash? it's a bit weird having it beep twice) for clients that set both CLIPBOARD and PRIMARY.
 	set new_clipboard_value {}
@@ -262,8 +263,16 @@ menu .clipboard.menu -tearoff 1
 
 
 # Might be nice to indicate when the clipboard has changed:
-proc flash_clipboard_button {} {
-	.clipboard configure -background green -foreground white
+proc flash_clipboard_button {args} {
+	set bg ""
+	set fg ""
+	catch {set bg [lindex $args 0]}
+	catch {set fg [lindex $args 1]}
+	# option get .clipboard background Background ? Nope - hardcoded defaults.
+	# Toggle foreground and background by default:
+	if {$bg == ""} {set bg [.clipboard cget -foreground]}
+	if {$fg == ""} {set fg [.clipboard cget -background]}
+	.clipboard configure -background $bg -foreground $fg
 	after 150 {
 		.clipboard configure \
 			-background [lindex [.clipboard configure -background] 3] \
