@@ -23,7 +23,7 @@ set refresh_interval_s 2	;# Memory utilisation doesn't normally change very rapi
 # NOTE: changing the TearOff capability changes the number of items in menus!  Fragile!
 option add *TearOff 1
 # TODO: fixed-width font might be sensible for the informative tooltip-menus.
-#option add *font font_mono
+option add *font font_mono
 
 #set ::env(TERM) dumb	;# to avoid ANSI codes from dstat
 
@@ -81,8 +81,17 @@ proc update_tooltip_menu {} {
 	.info_menu entryconfigure [incr i] -label "Buffers:                     [format {%5d} [expr {round($::mem_buffer / 1024.0)}]] MiB"
 	.info_menu entryconfigure [incr i] -label "System Cache:                [format {%5d} [expr {round($::mem_cache / 1024.0)}]] MiB"
 	incr i
-	.info_menu entryconfigure [incr i] -label "Swap Used:                   [format {%5d} [expr {round($::swap_used / 1024.0)}]] MiB ([format {%2d} [expr round($::swap_used / double($::swap_total) * 100)]]%)"
-	.info_menu entryconfigure [incr i] -label "Swap Free:                   [format {%5d} [expr {round($::swap_free / 1024.0)}]] MiB ([format {%2d} [expr round($::swap_free / double($::swap_total) * 100)]]%)"
+	# It's possible the system has no swap, in which case we need to avoid dividing by zero ("domain error: argument not in valid range").
+	if {$::swap_used == 0 || $::swap_free == 0} {
+		set swap_used_pct_string ""
+		set swap_free_pct_string ""
+	} else {
+		set swap_used_pct_string " ([format {%2d} [expr round($::swap_used / double($::swap_total) * 100)]]%)"
+		set swap_free_pct_string " ([format {%2d} [expr round($::swap_free / double($::swap_total) * 100)]]%)"
+	}
+	# Or [catch ...]?
+	.info_menu entryconfigure [incr i] -label "Swap Used:                   [format {%5d} [expr {round($::swap_used / 1024.0)}]] MiB$swap_used_pct_string"
+	.info_menu entryconfigure [incr i] -label "Swap Free:                   [format {%5d} [expr {round($::swap_free / 1024.0)}]] MiB$swap_free_pct_string"
 }
 
 
@@ -156,7 +165,6 @@ proc read_input {input_stream} {
 #	expect eof {break}	;# i.e. not like this, which just causes an expect timeout, since it waits for EOF at every iteration of this while loop.
 }
 
-puts "Quitting."
-
 # Endut! Hoch hech!
+
 

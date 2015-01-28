@@ -6,10 +6,14 @@
 # Font stuff across Tk versions could get complicated (8.5 supports TrueType and antialiasing).
 # Also, it seems you can't override them once created (e.g. in user preferences). :^(
 
+# NOTE: to get bitmap fonts on Ubuntu, you might need to (sudo rm /etc/fonts/conf.d/70-no-bitmaps.conf; sudo fc-cache -f -v)!
+# Also, remember that negative numbers will give you pixel-based sizes.
+
 #{-*-cure-*-*-*-*-11-*-*-*-*-*-*-*}	;# Tiny!
 #set font_mono  {}
 # Letter Gothic 12 Pitch, Lucida Sans Typewriter, LucidaTypewriter, Orator, Prestige
 #font create font_mono -family lucidatypewriter -size -12
+font create font_mono -family {Letter Gothic 12 Pitch} -size 9
 
 #set font_sans  {-*-helvetica-medium-r-*-*-11-*-*-*-*-*-*-*}
 #font create font_sans -family Helvetica -size -12	;# -size is in what units?  Ah, if negavite, pixels.
@@ -64,4 +68,5 @@ option add *Cursor hand2 widgetDefault
 
 # Always pull in user preferences too, if they exist?
 catch {source ~/.desknerd/global.tcl}
+
 
