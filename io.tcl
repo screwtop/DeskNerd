@@ -1,4 +1,5 @@
 #!/usr/bin/tclsh8.5
+#!/usr/bin/env tclsh
 
 package require Expect
 package require Tk
@@ -116,7 +117,7 @@ foreach device $device_names {
 	# Bevelled container frame:
 	pack [frame .gauges.$device  -width $indicator_width  -height $indicator_height  -relief sunken  -borderwidth 1 -background black] -side left
 	# Meter gauge itself is also done as a frame
-	place [frame .gauges.${device}.meter     -width [expr {$indicator_width-2}] -height 0  -relief flat -borderwidth 0 -background green] -anchor sw -x 0 -y [expr {$indicator_height-2}]
+	place [frame .gauges.${device}.meter     -width [expr {$indicator_width-2}] -height 0  -relief flat -borderwidth 0 -background #00FF00] -anchor sw -x 0 -y [expr {$indicator_height-2}]
 
 }
 
@@ -137,7 +138,7 @@ proc io_gauge_update {device value} {
 	if     {$value >= 0.90} then {set gauge_colour red} \
 	elseif {$value >= 0.75} then {set gauge_colour orange} \
 	elseif {$value >= 0.50} then {set gauge_colour yellow} \
-	else                         {set gauge_colour green}
+	else                         {set gauge_colour #00FF00}
 
 	# For queue length: < 1 is OK, more than 2 is def bad.  Give a bit of leeway (1.01 is close enough to 1 to be left green).
 	# {{0.35 green} {0.5 orange} {1.0 red}}
@@ -159,12 +160,18 @@ log_user 0
 #spawn iostat -x -m 1	;# Simple when no variable args, trickier when with:
 eval [list spawn iostat -x -m 1] [lrange $device_names 0 end]
 # Line format is "sda               0.00     0.00    0.00    0.00     0.00     0.00     0.00     0.00    0.00   0.00   0.00"
+# 2015-09-04: argh, iostat's output format has changed, at least on Ubuntu (iostat May 2012, according to `man` page). I thought the utilisation graph wasn't showing the correct activity!
+#  1                    2        3       4       5        6        7        8        9      10      11      12     13     14
+# "Device:         rrqm/s   wrqm/s     r/s     w/s    rMB/s    wMB/s avgrq-sz avgqu-sz   await r_await w_await  svctm  %util"
+# "sda               0.00     6.00    2.00   20.00     0.01     0.21    20.00     0.22    9.82   18.00    9.00   1.64   3.60"
+
 while true {
-	expect -re [concat $device_pattern { +([0-9\.]+) +([0-9\.]+) +([0-9\.]+) +([0-9\.]+) +([0-9\.]+) +([0-9\.]+) +([0-9\.]+) +([0-9\.]+) +([0-9\.]+) +([0-9\.]+) +([0-9\.]+)}] {
+	expect -re [concat $device_pattern { +([0-9\.]+) +([0-9\.]+) +([0-9\.]+) +([0-9\.]+) +([0-9\.]+) +([0-9\.]+) +([0-9\.]+) +([0-9\.]+) +([0-9\.]+) +([0-9\.]+) +([0-9\.]+) +([0-9\.]+) +([0-9\.]+)}] {
 		# 0 -> whole match, 1 -> "device", ...
+	#	puts "`iostat` line: $expect_out(0,string)"
 		set device $expect_out(1,string)
-		set utilisation [expr {$expect_out(12,string) / 100.0}]
-		set queue_length [expr {$expect_out(9,string)}]
+		set utilisation [expr {$expect_out(14,string) / 100.0}]
+		set queue_length [expr {$expect_out(9,string)}]	;# avgqu-sz
 		set queue_length_meter [expr {1 - pow(1/sqrt(2.0), $queue_length)}]
 	#	puts "device = $device	utilisation = $utilisation	queue length = $queue_length	meter = $queue_length_meter"
 		set reads_per_second [expr {$expect_out(4,string)}]
@@ -185,4 +192,5 @@ while true {
 }
 
 # Wow, that was pretty easy...
+
 
