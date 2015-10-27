@@ -1,5 +1,7 @@
 -- TODO: come up with a name for this whole thing ("DeskNerd"?).
 
+-- TODO: have 'dopath("winprops_desknerd")' added to ~/ion3/cfg_ion.lua (or the notion equivalent!)
+
 -- Does "name" correspond to "WClientWin"?  Yes, I guess it does - it works!
 -- is_dockapp rather than statusbar???
 
