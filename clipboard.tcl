@@ -182,6 +182,11 @@ proc defacebookify {url} {
 	urlDecode [urlDecode [lindex [split $url /] end]]
 }
 
+# We also get URLs like these in Facebook notification e-mails:
+# http://l.facebook.com/l/7AQ[...]pwA/www.lostateminor.com/2015/12/05/cute-illustrations-show-how-love-is-found-in-little-everyday-activities/
+proc defacebookmailify {url} {
+	regsub {^http://l.facebook.com/l/[^/]+/} $url {http://}
+}
 
 
 # The set_clipboard_value proc is for setting the canonical (internal) clipboard value, to be shared by both CLIPBOARD and PRIMARY selections when other clients ask for those.
@@ -251,10 +256,11 @@ menu .clipboard.menu -tearoff 1
 	set ::qr_menu_index 2
 	.clipboard.menu add separator	;# entry 3: separator
 	.clipboard.menu add command -label "De-Facebook-ify URL" -command {set_clipboard_value [defacebookify [clipboard get]]}	;# entry 4
-	.clipboard.menu add command -label "De-Google-ify URL" -command {set_clipboard_value [degooglify [clipboard get]]}	;# entry 5
-	.clipboard.menu add separator	;# entry 4: separator
-	.clipboard.menu add command -label "Load file into clipboard\u2026" -command prompt_load_file_to_clipboard	;# entry 7
-	.clipboard.menu add command -label "Save clipboard to file\u2026" -command prompt_save_clipboard_to_file	;# entry 8
+	.clipboard.menu add command -label "De-Facebook-ify URL (e-mailed link)" -command {set_clipboard_value [defacebookmailify [clipboard get]]}	;# entry 5
+	.clipboard.menu add command -label "De-Google-ify URL" -command {set_clipboard_value [degooglify [clipboard get]]}	;# entry 6
+	.clipboard.menu add separator	;# entry 7: separator
+	.clipboard.menu add command -label "Load file into clipboard\u2026" -command prompt_load_file_to_clipboard	;# entry 8
+	.clipboard.menu add command -label "Save clipboard to file\u2026" -command prompt_save_clipboard_to_file	;# entry 9
 	# TODO: other send mechanisms, such as e-mail, XMPP, SCP, ...?
 
 # TODO: would be nice to be able to copy (or save) the resulting QR image as well, actually...
