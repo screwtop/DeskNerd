@@ -13,7 +13,8 @@
 #set font_mono  {}
 # Letter Gothic 12 Pitch, Lucida Sans Typewriter, LucidaTypewriter, Orator, Prestige
 #font create font_mono -family lucidatypewriter -size -12
-font create font_mono -family {Letter Gothic 12 Pitch} -size 9
+#set font_mono {{Letter Gothic 12 Pitch} 10}
+font create font_mono -family {Letter Gothic 12 Pitch} -size 10
 
 #set font_sans  {-*-helvetica-medium-r-*-*-11-*-*-*-*-*-*-*}
 #font create font_sans -family Helvetica -size -12	;# -size is in what units?  Ah, if negavite, pixels.
@@ -67,6 +68,4 @@ option add *Cursor hand2 widgetDefault
 
 
 # Always pull in user preferences too, if they exist?
-catch {source ~/.desknerd/global.tcl}
-
-
+catch {source [file normalize ~/.config/DeskNerd/Preferences.tcl]}

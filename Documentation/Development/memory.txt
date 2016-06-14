@@ -1,0 +1,57 @@
+proc slurp {filename} {
+	set file_handle [open $filename r]
+	set file_data [read $file_handle]
+	close $file_handle
+	return $file_data
+}
+
+set meminfo [slurp /proc/meminfo]
+
+# Convert into array for ease of reference:
+
+array unset memory_stat
+
+foreach statistic [split $meminfo "\n"] {
+	puts "<<$statistic>>"
+	regexp {^(.*): +([0-9]+) ?(.*)$} $statistic entire_match statistic_name statistic_value statistic_unit
+	set memory_stat($statistic_name) $statistic_value
+}
+
+puts $memory_stat(MemTotal)
+puts $memory_stat(MemFree)
+puts $memory_stat(MemAvailable)
+
+# xosview mentions USED/BUFF/SLAB/MAP/CACHE..
+# I wonder if CACHE is inode/metadata cache and BUFF is for file content..?
+
+# http://www.centos.org/docs/5/html/5.2/Deployment_Guide/s2-proc-meminfo.html
+
+# Definitive:
+# https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=34e431b0ae398fc54ea69ff85ec700722c9da773
+
+puts $memory_stat(Cached)
+puts $memory_stat(Buffers)
+puts $memory_stat(Slab)
+
+# Probably not otherwise reclaimable (effectively free):
+puts $memory_stat(Mapped)
+
+# Also potentially of interest:
+puts $memory_stat(Dirty)
+puts $memory_stat(Writeback)
+
+
+expr {}
+
+# Things of interest:
+MemTotal
+MemFree
+MemAvailable
+
+Mapped
+Slab
+Buffers
+Cached
+
+SwapTotal
+SwapFree
