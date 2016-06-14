@@ -18,7 +18,7 @@ set application_name {DeskNerd Memory Meter}
 wm title . $application_name
 
 source {Preferences.tcl}
-catch {source ~/.desknerd/memory.tcl}
+catch {source ~/.desknerd/memory.tcl}	;# TODO: move to ~/.config/DeskNerd
 
 source {every.tcl}
 source {number_formatting.tcl}
@@ -37,6 +37,7 @@ set indicator_width 8
 set indicator_height 20
 
 set use_proc_meminfo 1
+set ::debugging 0
 set update_interval_milliseconds 1000
 
 
@@ -57,7 +58,7 @@ proc read_meminfo {} {
 
 	# Convert into array for ease of reference:
 	foreach statistic [split $meminfo "\n"] {
-	#	puts "<<$statistic>>"
+		if $::debugging {puts stderr "<<$statistic>>"}
 		regexp {^(.*): +([0-9]+) ?(.*)$} $statistic entire_match statistic_name statistic_value statistic_unit
 		set ::memory_stat($statistic_name) $statistic_value
 		# TODO: keep $statistic_unit as well?  They're all kiB at the moment, but in future...?
