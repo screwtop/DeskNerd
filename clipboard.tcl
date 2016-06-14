@@ -24,7 +24,7 @@
 # DONE: convert to using a menubutton for docking into the statusbar/systray.
 # TODO: handle tzint failure, e.g. "can't read "qr_xbm": no such variable"
 # TODO: add -type (e.g. UTF8_STRING) where appropriate. [clipboard get], [clipboard append], [selection get], and [selection handle] support this argument.
-# "DKF: Sometimes you need to get UTF-8 characters through the selection (especially the clipboard) on Unix/X11. Tk's default bindings handle most of this automatically for you, but sometimes you need to do a bit more.  This is because the STRING selection type (selections can have many types at once) does not properly support anything other than ASCII for historic reasons. A standard introduced a while back to work around this problem uses the UTF8_STRING selection type instead (and that causes string data to be sent as utf-8, which we handle just nicely) and we support exporting the data using that type automatically: you don't need to do anything to make that work. But when reading a selection, you have to handle it manually (Tk's default bindings do this for you normally, but they're just scripted). The correct way to do this is, when looking to get a string from the selection, to try to read the get the selection with type UTF8_STRING first, and only if that fails fall back to using STRING."
+# http://wiki.tcl.tk/1456 -> "DKF: Sometimes you need to get UTF-8 characters through the selection (especially the clipboard) on Unix/X11. Tk's default bindings handle most of this automatically for you, but sometimes you need to do a bit more.  This is because the STRING selection type (selections can have many types at once) does not properly support anything other than ASCII for historic reasons. A standard introduced a while back to work around this problem uses the UTF8_STRING selection type instead (and that causes string data to be sent as utf-8, which we handle just nicely) and we support exporting the data using that type automatically: you don't need to do anything to make that work. But when reading a selection, you have to handle it manually (Tk's default bindings do this for you normally, but they're just scripted). The correct way to do this is, when looking to get a string from the selection, to try to read the get the selection with type UTF8_STRING first, and only if that fails fall back to using STRING."
 
 # WTF: I'm seeing periodic requests for the clipboard contents that I don't believe are originating from this program's behaviour...
 # ...turns out it's Adobe Reader (version 9 on Linux). Every 1.7 seconds it reads from CLIPBOARD. Weird.
@@ -44,6 +44,15 @@ source debugging.tcl
 
 # TODO: honour this
 set ::do_beep false
+
+# Generally want UTF8_STRING, only Chrome seems to reject those (anti-phishing measure?). I don't know if we can be selective about which types to give which clients.
+
+# A couple of procs for setting ::TEXT_TYPE:
+proc use_utf8  {} {set ::TEXT_TYPE UTF8_STRING}
+proc use_ascii {} {set ::TEXT_TYPE STRING}
+
+use_utf8
+
 
 # Tolerate absence of tzint:
 if {[catch {package require tzint}]} {
@@ -123,12 +132,12 @@ proc reown_selection {SELECTION} {
 	beep 512 8
 	# Only go through the whole set_clipboard_value process if it's actually changed. This avoids excessive work in regenerating the QR code, and also redundant work (and perhaps user notifications such as beep/flash? it's a bit weird having it beep twice) for clients that set both CLIPBOARD and PRIMARY.
 	set new_clipboard_value {}
-	catch {set new_clipboard_value [selection get -selection $SELECTION -type UTF8_STRING]}
+	catch {set new_clipboard_value [selection get -selection $SELECTION -type $::TEXT_TYPE]}
 	if {$new_clipboard_value != $::clipboard_value} {
-		catch {set_clipboard_value [selection get -selection $SELECTION -type UTF8_STRING]}
+		catch {set_clipboard_value [selection get -selection $SELECTION -type $::TEXT_TYPE]}
 	}
 	selection own -command [list schedule_reown_selection $SELECTION] -selection $SELECTION .
-	selection handle -selection $SELECTION -type UTF8_STRING . selection_handler
+	selection handle -selection $SELECTION -type $::TEXT_TYPE . selection_handler
 }
 
 # This is just a wrapper around reown_selection with a delay, so that things like triple-clicking (hopefully) aren't disturbed.
@@ -259,13 +268,16 @@ menu .clipboard.menu -tearoff 1
 	.clipboard.menu add command -image $::qr_image -background white	;# entry 2: QR code (NOTE: or -bitmap)
 	set ::qr_menu_index 2
 	.clipboard.menu add separator	;# entry 3: separator
-	.clipboard.menu add command -label "De-Facebook-ify URL" -command {set_clipboard_value [defacebookify [clipboard get -type UTF8_STRING]]}	;# entry 4
-	.clipboard.menu add command -label "De-Facebook-ify URL (e-mailed link)" -command {set_clipboard_value [defacebookmailify [clipboard get -type UTF8_STRING]]}	;# entry 5
-	.clipboard.menu add command -label "De-Google-ify URL" -command {set_clipboard_value [degooglify [clipboard get -type UTF8_STRING]]}	;# entry 6
+	.clipboard.menu add command -label "De-Facebook-ify URL" -command {set_clipboard_value [defacebookify [clipboard get -type $::TEXT_TYPE]]}	;# entry 4
+	.clipboard.menu add command -label "De-Facebook-ify URL (e-mailed link)" -command {set_clipboard_value [defacebookmailify [clipboard get -type $::TEXT_TYPE]]}	;# entry 5
+	.clipboard.menu add command -label "De-Google-ify URL" -command {set_clipboard_value [degooglify [clipboard get -type $::TEXT_TYPE]]}	;# entry 6
 	.clipboard.menu add separator	;# entry 7: separator
 	.clipboard.menu add command -label "Load file into clipboard\u2026" -command prompt_load_file_to_clipboard	;# entry 8
 	.clipboard.menu add command -label "Save clipboard to file\u2026" -command prompt_save_clipboard_to_file	;# entry 9
 	# TODO: other send mechanisms, such as e-mail, XMPP, SCP, ...?
+	.clipboard.menu add separator	;# entry 10
+	.clipboard.menu add command -label "Use ASCII for clipboard text" -command use_ascii
+	.clipboard.menu add command -label "Use UTF-8 for clipboard text" -command use_utf8
 
 # TODO: would be nice to be able to copy (or save) the resulting QR image as well, actually...
 
@@ -380,7 +392,7 @@ proc clipboard_updater {} {
 	# (We have to copy it in order to display it in the GUI - no -textvariable possible here)
 	# Also, some applications will occasionally set the clipboard to the empty string (when exiting, for example, which is an annoyance that I've noted in the past).  Ignore such changes.
 	try {
-		set new_clipboard [selection get -selection CLIPBOARD -type UTF8_STRING]
+		set new_clipboard [selection get -selection CLIPBOARD -type $::TEXT_TYPE]
 		if {$new_clipboard != ""} {
 			set ::clipboard_selection_contents $new_clipboard
 			if {$new_clipboard != $::clipboard_old_selection_contents} {set something_changed true}
@@ -394,7 +406,7 @@ proc clipboard_updater {} {
 
 	# Do likewise with PRIMARY:
 	try {
-		set new_primary [selection get -selection PRIMARY -type UTF8_STRING]
+		set new_primary [selection get -selection PRIMARY -type $::TEXT_TYPE]
 		if {$new_primary != ""} {
 			set ::primary_selection_contents $new_primary
 			if {$new_primary != $::primary_old_selection_contents} {set something_changed true}
@@ -439,8 +451,8 @@ proc clipboard_updater {} {
 # When starting up, check for existing data in CLIPBOARD and PRIMARY, and make sure those are preserved.
 # If both have a value, choose one? Concatenate? Choose the longer one?  Just choose CLIPBOARD?
 # TODO: catch, perhaps?
-catch {set_clipboard_value [selection get -selection CLIPBOARD -type UTF8_STRING]}
-catch {set_clipboard_value [selection get -selection PRIMARY -type UTF8_STRING]}
+catch {set_clipboard_value [selection get -selection CLIPBOARD -type $::TEXT_TYPE]}
+catch {set_clipboard_value [selection get -selection PRIMARY -type $::TEXT_TYPE]}
 
 reown_selection PRIMARY
 reown_selection CLIPBOARD
