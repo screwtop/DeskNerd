@@ -1,5 +1,5 @@
-#!/usr/bin/tclsh8.5
 #!/usr/bin/env tclsh
+#!/usr/bin/tclsh8.5
 
 package require Expect
 package require Tk
