@@ -1,3 +1,4 @@
+#!/usr/bin/env wish
 #!/usr/bin/wish8.5
 
 # Basic memory usage indicator for DeskNerd.  We could show cache, swap, wired, etc. but what we really care about is how much physical RAM is used out of the available physical RAM.
@@ -23,7 +24,7 @@ set refresh_interval_s 2	;# Memory utilisation doesn't normally change very rapi
 # NOTE: changing the TearOff capability changes the number of items in menus!  Fragile!
 option add *TearOff 1
 # TODO: fixed-width font might be sensible for the informative tooltip-menus.
-option add *font font_mono
+#option add *font font_mono
 
 #set ::env(TERM) dumb	;# to avoid ANSI codes from dstat
 
