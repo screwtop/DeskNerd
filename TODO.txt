@@ -4,4 +4,5 @@
 [ ] Factor out gauge rendering code (while still allowing custom functions and perhaps also custom colour mapping).
 [ ] Parameterise the I/O meter for device name.
 [ ] Make CPU meter figure out number of CPUs automatically.
-
+[ ] Consider using /proc/meminfo for memory.tcl for greater detail and accuracy in accounting for memory.  For example, "Mapped" can be several hundred MB and probably shouldn't count as "unused".
+[ ] Be smarter with clipboard selection type handling: Chromium doesn't seem to like UTF8_STRING!
