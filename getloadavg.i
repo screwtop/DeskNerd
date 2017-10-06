@@ -23,9 +23,9 @@ exit
 %inline %{
 
 double loadavg_1m() {
-	double* result;
+	double result[1];
 	getloadavg(result, 1);
-	return *result;
+	return result[0];
 }
 
 double loadavg_5m() {
