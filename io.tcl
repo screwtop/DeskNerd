@@ -1,5 +1,5 @@
-#!/usr/bin/tclsh8.5
 #!/usr/bin/env tclsh
+#!/usr/bin/tclsh8.5
 
 package require Expect
 package require Tk
@@ -27,15 +27,22 @@ option add *TearOff 1
 option add *font font_sans
 
 
+
+set field_names {reads_completed reads_merged sectors_read milliseconds_reading writes_completed writes_merged sectors_written milliseconds_writing queue_length milliseconds_io weighted_milliseconds_io discards_completed discards_merged sectors_discarded milliseconds_discarding}
+
+
 # List of devices to monitor:
 # You can include additional devices like sr0 here, which otherwise don't show up.
 # iostat also lets you monitor individual partitions.
 # Getting a list from /sys/block might also be effective.
 # It would be nice to let iostat display everything, but how do we know what meter gauge's we'll need?
-set device_names {sda sr0}	;# Likely minimum on modern systems.
+#set device_names {sda sr0}	;# Likely minimum on modern systems.
+set device_names {sda}	;# For testing
 #set device_names {}
 # User preferences/settings file:
 catch {source ~/.desknerd/io.tcl}
+
+source util.tcl
 
 if {![info exists device_names]} {
 	set device_names {sda hda sr0}	;# Probably a fair stab
@@ -95,14 +102,14 @@ proc update_tooltip_menu {device util depth reads writes read_mb write_mb} {
 	incr i
 	.info_menu entryconfigure [incr i] -label "Util.: [expr {round($util * 100)}] %"
 	.info_menu entryconfigure [incr i] -label "Queue: $depth"
-	.info_menu entryconfigure [incr i] -label "IO/s: [expr {$reads + $writes}]"
-	.info_menu entryconfigure [incr i] -label "MB/s: [expr {$read_mb + $write_mb}]"
+	.info_menu entryconfigure [incr i] -label "IO/s: [format %0.0f [expr {$reads + $writes}]]"
+	.info_menu entryconfigure [incr i] -label "MB/s: [format %0.1f [expr {$read_mb + $write_mb}]]"
 	incr i
-	.info_menu entryconfigure [incr i] -label "Reads/s: $reads"
-	.info_menu entryconfigure [incr i] -label "Writes/s: $writes"
+	.info_menu entryconfigure [incr i] -label "Reads/s: [format %0.0f $reads]"
+	.info_menu entryconfigure [incr i] -label "Writes/s: [format %0.0f $writes]"
 	incr i
-	.info_menu entryconfigure [incr i] -label "Read MB/s: $read_mb"
-	.info_menu entryconfigure [incr i] -label "Write MB/s: $write_mb"
+	.info_menu entryconfigure [incr i] -label "Read MB/s: [format %0.1f $read_mb]"
+	.info_menu entryconfigure [incr i] -label "Write MB/s: [format %0.1f $write_mb]"
 }
 
 
@@ -155,42 +162,98 @@ source reset_window.tcl
 reset_window
 
 
-#stty -echo	;# No, that's for passwords! :)
-log_user 0
-#spawn iostat -x -m 1	;# Simple when no variable args, trickier when with:
-eval [list spawn iostat -x -m 1] [lrange $device_names 0 end]
-# Line format is "sda               0.00     0.00    0.00    0.00     0.00     0.00     0.00     0.00    0.00   0.00   0.00"
-# 2015-09-04: argh, iostat's output format has changed, at least on Ubuntu (iostat May 2012, according to `man` page). I thought the utilisation graph wasn't showing the correct activity!
-#  1                    2        3       4       5        6        7        8        9      10      11      12     13     14
-# "Device:         rrqm/s   wrqm/s     r/s     w/s    rMB/s    wMB/s avgrq-sz avgqu-sz   await r_await w_await  svctm  %util"
-# "sda               0.00     6.00    2.00   20.00     0.01     0.21    20.00     0.22    9.82   18.00    9.00   1.64   3.60"
-
-while true {
-	expect -re [concat $device_pattern { +([0-9\.]+) +([0-9\.]+) +([0-9\.]+) +([0-9\.]+) +([0-9\.]+) +([0-9\.]+) +([0-9\.]+) +([0-9\.]+) +([0-9\.]+) +([0-9\.]+) +([0-9\.]+) +([0-9\.]+) +([0-9\.]+)}] {
-		# 0 -> whole match, 1 -> "device", ...
-	#	puts "`iostat` line: $expect_out(0,string)"
-		set device $expect_out(1,string)
-		set utilisation [expr {$expect_out(14,string) / 100.0}]
-		set queue_length [expr {$expect_out(9,string)}]	;# avgqu-sz
-		set queue_length_meter [expr {1 - pow(1/sqrt(2.0), $queue_length)}]
-	#	puts "device = $device	utilisation = $utilisation	queue length = $queue_length	meter = $queue_length_meter"
-		set reads_per_second [expr {$expect_out(4,string)}]
-		set writes_per_second [expr {$expect_out(5,string)}]
-		set read_megabytes_per_second [expr {$expect_out(6,string)}]
-		set write_megabytes_per_second [expr {$expect_out(7,string)}]
-
-		io_gauge_update $device $utilisation
-		update_tooltip_menu $device $utilisation $queue_length $reads_per_second $writes_per_second $read_megabytes_per_second $write_megabytes_per_second
-		
-		# A queue length of 1 is fine for a single drive; 2 or higher may be a problem.  I've seen the queue length exceed 400(!) on sbis4079's single drive.
-		# What sort of scaling to use?  Maybe logarithmic?  meter = 1 - (constant ^ queue_length) looks suitable.
-	#	io_gauge_update $sda_queue_length_meter
-	#	io_gauge_update [expr {1 - 0.70710 ** $sda_queue_length}]	;# Doesn't work - maybe due to no ** in older Tcl usend in the expectk I have?  Seems OK in Tcl 8.5.
-	#	io_gauge_update [expr {$sda_queue_length / 150}]	;# Old arbitrary scaling
-
+proc init {} {
+	global device_names last_ms field_names last delta
+	set last_ms 0
+	foreach device $device_names {
+		foreach field_name $field_names {
+			set last($device,$field_name) 0
+		}
+	#	set delta($device,ms) 0
 	}
 }
 
-# Wow, that was pretty easy...
 
+
+# TODO: final refactoring to properly support passing the device name as arg:
+# Or maybe the ms and last_ms can be done in the main loop?
+proc read_stats {device} {
+	global field_names last $device
+#	set ms [clock millis]
+	set stats [slurp /sys/block/$device/stat]
+	
+#	puts $stats
+
+	# TODO: maybe treat timestamp as a field so that it'll get added to the delta array automatically.
+	# TODO: store separate ms and last_ms for each device?!
+#	set ms_delta [expr {$ms - $last_ms}]
+#	set delta($device,ms) $ms_delta
+#	puts "time delta = $ms_delta ms"
+
+	lassign $stats {*}$field_names
+#	lassign $stats reads_completed reads_merged sectors_read milliseconds_reading writes_completed writes_merged sectors_written milliseconds_writing milliseconds_io weighted_milliseconds_io discards_completed discards_merged sectors_discarded milliseconds_discarding
+
+
+#	foreach f $field_names {
+#		puts "$f = [set $f]"
+#	}
+	
+	# Compute deltas
+	foreach field_name $field_names {
+		set delta($device,$field_name) [expr {[set $field_name] - $last($device,$field_name)}]
+		set last($device,$field_name) [set $field_name]
+	}
+	
+#	parray delta
+	
+	# Compute % read time, % write time, and total % utilisation:
+	# Well, maybe as decimals, not percentages. Convert to % for display, perhaps.
+	set read_utilisation [expr {$delta($device,milliseconds_reading) / double($::ms_delta)}]
+	set write_utilisation [expr {$delta($device,milliseconds_writing) / double($::ms_delta)}]
+	set total_utilisation [expr {$read_utilisation + $write_utilisation}]
+#	puts "Utilisation: read: [format %0.2f $read_utilisation]%, write: [format %0.2f $write_utilisation]%, total: [format %0.2f $total_utilisation]%"
+	
+	# Compute I/O operations per second:
+	set reads_per_second [expr {$delta($device,reads_completed) / ($::ms_delta / 1000.0)}]
+	set writes_per_second [expr {$delta($device,writes_completed) / ($::ms_delta / 1000.0)}]
+	set total_iops [expr {$reads_per_second + $writes_per_second}]
+#	puts "IOPS: read: [format %0.0f $reads_per_second] IO/s, write: [format %0.0f $writes_per_second] IO/s, total: [format %0.0f $total_iops] IO/s"
+	
+	# Compute throughput (MiB/s):
+	set read_throughput [expr {$delta($device,sectors_read) * 512 / 1048576.0 / ($::ms_delta / 1000.0)}]
+	set write_throughput [expr {$delta($device,sectors_written) * 512 / 1048576.0 / ($::ms_delta / 1000.0)}]
+	set total_throughput [expr {$read_throughput + $write_throughput}]
+#	puts "Throughput: read: [format %0.2f $read_throughput] MiB/s, write: [format %0.2f $write_throughput] MiB/s, total: [format %0.2f $total_throughput] MiB/s"
+	
+	# No delta for this one:
+	# Moreover, no data neither?!
+#	puts "Queue length: $queue_length"
+	
+	# Return the data as a dict?
+	foreach field {read_utilisation write_utilisation total_utilisation reads_per_second writes_per_second total_iops read_throughput write_throughput total_throughput queue_length} {
+		dict set data $field [set $field]
+	}
+	return $data
+}
+
+
+init
+
+every 1000 {
+	set ::ms [clock millis]
+	# TODO: maybe treat timestamp as a device array field so that it'll get added to the delta array automatically. Store separate ms and last_ms for each device?!
+	set ::ms_delta [expr {$::ms - $::last_ms}]
+	set ::last_ms $::ms
+	
+#	puts "time delta = $::ms_delta ms"
+	
+	set device sda	;#  TODO: do it for all $device_names
+#	set delta($device,ms) $ms_delta
+	set data [read_stats $device]
+	io_gauge_update $device [dict get $data total_utilisation]
+	update_tooltip_menu $device [dict get $data total_utilisation] [dict get $data queue_length] [dict get $data reads_per_second] [dict get $data writes_per_second] [dict get $data read_throughput] [dict get $data write_throughput]
+	# $read_megabytes_per_second $write_megabytes_per_second
+}
+
+# Hopefully that'll prove more stable than the old iostat variant.
 
